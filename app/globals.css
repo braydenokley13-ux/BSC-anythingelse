@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bsc-bg: #0a0e1a;
+  --bsc-surface: #111827;
+  --bsc-card: #1a2035;
+  --bsc-border: #1e293b;
+  --bsc-accent: #f59e0b;
+  --bsc-green: #10b981;
+  --bsc-red: #ef4444;
+  --bsc-blue: #3b82f6;
+  --bsc-text: #e2e8f0;
+  --bsc-muted: #64748b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bsc-bg);
+  color: var(--bsc-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+.bsc-card {
+  background: var(--bsc-card);
+  border: 1px solid var(--bsc-border);
+  border-radius: 0.75rem;
+}
+
+.bsc-badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ticker-bar {
+  background: linear-gradient(90deg, #1a2035 0%, #111827 100%);
+  border-bottom: 1px solid var(--bsc-border);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+@keyframes ticker {
+  0% { transform: translateX(100vw); }
+  100% { transform: translateX(-100%); }
+}
+
+.ticker-inner {
+  display: inline-block;
+  animation: ticker 30s linear infinite;
+}
+
+.salary-bar-green { background: linear-gradient(90deg, #10b981, #34d399); }
+.salary-bar-yellow { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.salary-bar-red { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.8); }
+}
+
+.glow-accent { animation: pulse-glow 2s ease-in-out infinite; }
+
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.count-in { animation: count-up 0.5s ease-out forwards; }
+
+.morale-bar {
+  transition: width 0.8s ease-in-out;
+}
+
+.verdict-slide {
+  animation: count-up 0.6s ease-out;
+}

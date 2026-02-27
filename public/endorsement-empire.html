@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Endorsement Empire — BSC</title>
+<style>
+  :root{--bg:#0a0e1a;--surface:#111827;--card:#1a2035;--border:#1e293b;--accent:#f59e0b;--green:#10b981;--red:#ef4444;--blue:#3b82f6;--text:#e2e8f0;--muted:#64748b}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min-height:100vh}
+  .nav{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:12px}
+  .nav a{color:var(--muted);text-decoration:none;font-size:13px;transition:.2s}.nav a:hover{color:var(--accent)}
+  .logo{color:var(--accent);font-weight:900;font-size:18px;letter-spacing:-1px}
+  .container{max-width:900px;margin:0 auto;padding:32px 16px}
+  h1{font-size:32px;font-weight:900;margin-bottom:8px}
+  h2{font-size:18px;font-weight:700;margin-bottom:16px}
+  .subtitle{color:var(--muted);margin-bottom:32px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+  .deal-card{background:var(--card);border:2px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;text-align:left}
+  .deal-card:hover{border-color:var(--muted)}
+  .deal-card.selected{border-color:var(--accent);background:#2a1f00}
+  .deal-card .icon{font-size:32px;margin-bottom:8px}
+  .deal-card .brand{font-weight:700;font-size:14px;margin-bottom:2px}
+  .deal-card .category{color:var(--muted);font-size:12px;margin-bottom:12px}
+  .stat-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px}
+  .stat-label{color:var(--muted)}
+  .green{color:var(--green)}.red{color:var(--red)}.blue{color:var(--blue)}.accent{color:var(--accent)}
+  .btn{background:var(--accent);color:#000;font-weight:900;border:none;border-radius:10px;padding:14px 28px;cursor:pointer;font-size:16px;transition:.2s;width:100%}
+  .btn:hover{opacity:.9}.btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-sm{font-size:13px;padding:8px 16px;width:auto}
+  .progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:4px}
+  .progress-fill{height:100%;border-radius:4px;transition:width .8s ease}
+  .event-box{background:var(--surface);border-left:4px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:8px;font-size:13px}
+  .scoreboard{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+  .score-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center}
+  .score-val{font-size:28px;font-weight:900}
+  .score-label{color:var(--muted);font-size:12px;margin-top:4px}
+  .hidden{display:none}
+  .phase-bar{display:flex;gap:6px;margin-bottom:24px}
+  .phase-dot{height:6px;flex:1;border-radius:3px;background:var(--border)}
+  .phase-dot.active{background:var(--accent)}
+  .phase-dot.done{background:var(--green)}
+  select{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px}
+  .archetype-card{background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:.2s}
+  .archetype-card:hover{border-color:var(--muted)}
+  .archetype-card.selected{border-color:var(--accent);background:#2a1f00}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="logo">BSC</a>
+  <span style="color:var(--border)">|</span>
+  <a href="/">← Back to Hub</a>
+</nav>
+
+<div class="container">
+
+<!-- INTRO SCREEN -->
+<div id="screen-intro">
+  <div style="text-align:center;margin-bottom:32px">
+    <div style="font-size:64px;margin-bottom:16px">💰</div>
+    <h1>ENDORSEMENT EMPIRE</h1>
+    <p class="subtitle">Your player's career is your brand. Build it wisely — or watch it burn.</p>
+  </div>
+
+  <div class="card" style="margin-bottom:24px">
+    <h2>How It Works</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+      <div>📅 <strong>3 seasons</strong> of brand building</div>
+      <div>📺 Choose from <strong>real brand categories</strong></div>
+      <div>⚡ <strong>Random events</strong> shake things up mid-year</div>
+      <div>🤖 An <strong>AI rival player</strong> competes against you</div>
+    </div>
+  </div>
+
+  <h2>Choose Your Player Archetype</h2>
+  <div class="card-grid">
+    <div class="archetype-card" onclick="selectArchetype('scorer')" id="arch-scorer">
+      <div style="font-size:28px;margin-bottom:8px">🏀</div>
+      <div style="font-weight:700;margin-bottom:4px">Elite Scorer</div>
+      <div style="color:var(--muted);font-size:12px">High performance brand value. Athletic sponsors love you.</div>
+      <div class="stat-row" style="margin-top:12px"><span class="stat-label">Brand Ceiling</span><span class="green">Very High</span></div>
+      <div class="stat-row"><span class="stat-label">Scandal Risk</span><span class="accent">Medium</span></div>
+    </div>
+    <div class="archetype-card" onclick="selectArchetype('star')" id="arch-star">
+      <div style="font-size:28px;margin-bottom:8px">⭐</div>
+      <div style="font-weight:700;margin-bottom:4px">Polarizing Star</div>
+      <div style="color:var(--muted);font-size:12px">Huge upside, huge downside. High risk, high reward brands.</div>
+      <div class="stat-row" style="margin-top:12px"><span class="stat-label">Brand Ceiling</span><span class="accent">Extreme</span></div>
+      <div class="stat-row"><span class="stat-label">Scandal Risk</span><span class="red">High</span></div>
+    </div>
+    <div class="archetype-card" onclick="selectArchetype('workhorse')" id="arch-workhorse">
+      <div style="font-size:28px;margin-bottom:8px">💪</div>
+      <div style="font-weight:700;margin-bottom:4px">Quiet Workhorse</div>
+      <div style="color:var(--muted);font-size:12px">Steady, reliable value. Brands love the consistency.</div>
+      <div class="stat-row" style="margin-top:12px"><span class="stat-label">Brand Ceiling</span><span class="blue">Moderate</span></div>
+      <div class="stat-row"><span class="stat-label">Scandal Risk</span><span class="green">Low</span></div>
+    </div>
+    <div class="archetype-card" onclick="selectArchetype('icon')" id="arch-icon">
+      <div style="font-size:28px;margin-bottom:8px">👑</div>
+      <div style="font-weight:700;margin-bottom:4px">Cultural Icon</div>
+      <div style="color:var(--muted);font-size:12px">Beyond basketball. Media, fashion, music — brands want the culture.</div>
+      <div class="stat-row" style="margin-top:12px"><span class="stat-label">Brand Ceiling</span><span class="green">Very High</span></div>
+      <div class="stat-row"><span class="stat-label">Scandal Risk</span><span class="accent">Medium</span></div>
+    </div>
+  </div>
+
+  <div style="margin-top:8px">
+    <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:8px">Grade Level:</label>
+    <select id="track-select" onchange="setTrack(this.value)">
+      <option value="easy">5th–6th Grade (with hints)</option>
+      <option value="hard">7th–8th Grade (Hard Mode)</option>
+    </select>
+  </div>
+
+  <button class="btn" style="margin-top:24px" onclick="startGame()" id="start-btn" disabled>SELECT AN ARCHETYPE TO START</button>
+</div>
+
+<!-- MAIN GAME SCREEN -->
+<div id="screen-game" class="hidden">
+  <div class="phase-bar">
+    <div class="phase-dot" id="dot-1"></div>
+    <div class="phase-dot" id="dot-2"></div>
+    <div class="phase-dot" id="dot-3"></div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <h1 id="season-title">Season 1</h1>
+    <div style="text-align:right">
+      <div id="brand-value-display" style="font-size:24px;font-weight:900;color:var(--accent)">$0M</div>
+      <div style="color:var(--muted);font-size:12px">Brand Portfolio Value</div>
+    </div>
+  </div>
+
+  <div id="hint-box" class="card" style="border-left:4px solid var(--blue);margin-bottom:16px">
+    <div style="color:var(--blue);font-weight:700;font-size:12px;margin-bottom:4px">💡 GUIDE</div>
+    <div id="hint-text" style="font-size:13px;color:#94a3b8"></div>
+  </div>
+
+  <div class="scoreboard">
+    <div class="score-card">
+      <div class="score-val green" id="your-total">$0M</div>
+      <div class="score-label">Your Portfolio</div>
+    </div>
+    <div class="score-card">
+      <div class="score-val red" id="ai-total">$0M</div>
+      <div class="score-label">AI Rival Portfolio</div>
+    </div>
+  </div>
+
+  <h2>Choose Your Deals (pick up to 2)</h2>
+  <div id="deals-grid" class="card-grid"></div>
+
+  <div id="selected-deals" style="margin-bottom:16px"></div>
+
+  <button class="btn" onclick="lockDeals()" id="lock-btn">LOCK IN DEALS →</button>
+</div>
+
+<!-- EVENTS SCREEN -->
+<div id="screen-events" class="hidden">
+  <h1>Season <span id="event-season-num"></span> Events</h1>
+  <p class="subtitle">Things happened this season that affected your brand value.</p>
+
+  <div id="events-list" style="margin-bottom:24px"></div>
+
+  <div class="scoreboard">
+    <div class="score-card">
+      <div class="score-val green" id="post-your-total">$0M</div>
+      <div class="score-label">Your Brand (after events)</div>
+    </div>
+    <div class="score-card">
+      <div class="score-val red" id="post-ai-total">$0M</div>
+      <div class="score-label">AI Rival (after events)</div>
+    </div>
+  </div>
+
+  <button class="btn" onclick="nextSeason()" id="next-season-btn">NEXT SEASON →</button>
+</div>
+
+<!-- OUTCOME SCREEN -->
+<div id="screen-outcome" class="hidden">
+  <div style="text-align:center;margin-bottom:32px">
+    <div style="font-size:64px;margin-bottom:16px" id="outcome-emoji"></div>
+    <h1 id="outcome-title"></h1>
+    <p id="outcome-subtitle" class="subtitle"></p>
+  </div>
+
+  <div class="scoreboard">
+    <div class="score-card">
+      <div class="score-val green" id="final-your"></div>
+      <div class="score-label">Your Final Brand Value</div>
+    </div>
+    <div class="score-card">
+      <div class="score-val" id="final-ai"></div>
+      <div class="score-label">AI Rival Final Value</div>
+    </div>
+  </div>
+
+  <div class="card" id="breakdown-card">
+    <h2>Brand Breakdown</h2>
+    <div id="breakdown-content"></div>
+  </div>
+
+  <button class="btn" onclick="location.reload()">PLAY AGAIN</button>
+</div>
+
+</div>
+
+<script>
+const DEALS = [
+  {id:'nike',icon:'👟',brand:'Nike',cat:'Footwear',base:30,upside:0.4,risk:2,fit:{scorer:10,star:8,workhorse:6,icon:9},excl:'footwear'},
+  {id:'mcds',icon:'🍔',brand:"McDonald's",cat:'Fast Food',base:8,upside:0.1,risk:3,fit:{scorer:7,star:5,workhorse:8,icon:7},excl:'food'},
+  {id:'samsung',icon:'📱',brand:'Samsung',cat:'Tech',base:14,upside:0.2,risk:1,fit:{scorer:7,star:8,workhorse:7,icon:9},excl:'mobile'},
+  {id:'beats',icon:'🎧',brand:'Beats',cat:'Audio',base:10,upside:0.3,risk:2,fit:{scorer:8,star:9,workhorse:6,icon:10},excl:'audio'},
+  {id:'sprite',icon:'🥤',brand:'Sprite',cat:'Beverage',base:6,upside:0.15,risk:2,fit:{scorer:7,star:7,workhorse:8,icon:8},excl:'drink'},
+  {id:'kia',icon:'🚗',brand:'Kia',cat:'Auto',base:12,upside:0.1,risk:1,fit:{scorer:6,star:6,workhorse:9,icon:6},excl:'auto'},
+  {id:'crypto',icon:'₿',brand:'Crypto Exchange',cat:'Finance',base:20,upside:1.0,risk:9,fit:{scorer:5,star:9,workhorse:3,icon:6},excl:'crypto'},
+  {id:'media',icon:'🎬',brand:'Media Deal',cat:'Entertainment',base:15,upside:0.5,risk:4,fit:{scorer:6,star:8,workhorse:5,icon:10},excl:'media'},
+];
+
+const EVENTS = [
+  {id:'breakout',label:'🔥 Career-best season!',brandMult:1.25,prob:0.3},
+  {id:'scandal',label:'📰 Off-court controversy',brandMult:0.6,prob:0.2,forArchs:['star']},
+  {id:'injury',label:'🏥 Season-ending injury',brandMult:0.8,prob:0.15},
+  {id:'viral',label:'🎥 Viral moment — brand surges',brandMult:1.15,prob:0.4},
+  {id:'championship',label:'🏆 Won the championship!',brandMult:1.35,prob:0.25},
+  {id:'loss',label:'📉 Team missed playoffs — brand dips',brandMult:0.9,prob:0.35},
+  {id:'endorsement-bonus',label:'💰 Brand exceeded performance clauses',brandMult:1.1,prob:0.4},
+];
+
+let archetype='',track='easy',season=1,selectedDeals=[],yourValue=0,aiValue=15,history=[];
+
+function selectArchetype(a){
+  archetype=a;
+  document.querySelectorAll('.archetype-card').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('arch-'+a).classList.add('selected');
+  document.getElementById('start-btn').disabled=false;
+  document.getElementById('start-btn').textContent='START AS '+a.toUpperCase()+' →';
+}
+
+function setTrack(v){track=v;}
+
+function startGame(){
+  document.getElementById('screen-intro').classList.add('hidden');
+  document.getElementById('screen-game').classList.remove('hidden');
+  loadSeason();
+}
+
+function loadSeason(){
+  selectedDeals=[];
+  document.getElementById('season-title').textContent='Season '+season;
+  document.getElementById('brand-value-display').textContent='$'+yourValue.toFixed(0)+'M';
+  document.getElementById('your-total').textContent='$'+yourValue.toFixed(0)+'M';
+  document.getElementById('ai-total').textContent='$'+aiValue.toFixed(0)+'M';
+
+  // Update phase dots
+  for(let i=1;i<=3;i++){
+    const dot=document.getElementById('dot-'+i);
+    dot.className='phase-dot '+(i<season?'done':i===season?'active':'');
+  }
+
+  const hint=document.getElementById('hint-box');
+  const hintText=document.getElementById('hint-text');
+  if(track==='easy'){
+    hint.style.display='block';
+    hintText.textContent=season===1?'Pick up to 2 endorsement deals. Look at the base value and how well the brand fits your archetype. Higher fit = higher brand growth.':'Based on what happened last season, choose your next set of deals. You can keep existing sponsors or switch.';
+  } else hint.style.display='none';
+
+  renderDeals();
+}
+
+function renderDeals(){
+  const grid=document.getElementById('deals-grid');
+  grid.innerHTML='';
+  DEALS.forEach(deal=>{
+    const fit=deal.fit[archetype]||5;
+    const isSelected=selectedDeals.includes(deal.id);
+    const div=document.createElement('div');
+    div.className='deal-card'+(isSelected?' selected':'');
+    div.onclick=()=>toggleDeal(deal.id);
+    div.innerHTML=`
+      <div class="icon">${deal.icon}</div>
+      <div class="brand">${deal.brand}</div>
+      <div class="category">${deal.cat}</div>
+      <div class="stat-row"><span class="stat-label">Base Value</span><span class="accent">$${deal.base}M/yr</span></div>
+      <div class="stat-row"><span class="stat-label">Upside</span><span class="green">+${(deal.upside*100).toFixed(0)}%</span></div>
+      ${track==='easy'?`<div class="stat-row"><span class="stat-label">Archetype Fit</span><span class="${fit>=8?'green':fit>=6?'accent':'red'}">${fit}/10</span></div>`:''}
+      ${track==='hard'?`<div class="stat-row"><span class="stat-label">Scandal Risk</span><span class="${deal.risk>=7?'red':deal.risk>=4?'accent':'green'}">${deal.risk}/10</span></div>`:''}
+    `;
+    grid.appendChild(div);
+  });
+}
+
+function toggleDeal(id){
+  if(selectedDeals.includes(id)){selectedDeals=selectedDeals.filter(x=>x!==id);}
+  else if(selectedDeals.length<2){selectedDeals.push(id);}
+  document.getElementById('lock-btn').disabled=selectedDeals.length===0;
+  renderDeals();
+}
+
+function lockDeals(){
+  // Calculate value
+  let gained=0;
+  selectedDeals.forEach(id=>{
+    const deal=DEALS.find(d=>d.id===id);
+    const fit=deal.fit[archetype]||5;
+    gained+=deal.base*(1+fit/20);
+  });
+
+  // AI also picks deals (picks highest base value available)
+  const aiGain=DEALS.slice(0,2).reduce((s,d)=>s+d.base*0.8,0);
+  aiValue+=aiGain;
+  yourValue+=gained;
+
+  // Show events screen
+  document.getElementById('screen-game').classList.add('hidden');
+  document.getElementById('screen-events').classList.remove('hidden');
+  document.getElementById('event-season-num').textContent=season;
+
+  const events=generateEvents();
+  const list=document.getElementById('events-list');
+  list.innerHTML='';
+  let eventMult=1;
+  events.forEach(ev=>{
+    eventMult*=ev.brandMult;
+    const riskDeal=selectedDeals.map(id=>DEALS.find(d=>d.id===id)).find(d=>d&&d.risk>6);
+    const actualMult=riskDeal&&ev.id==='scandal'?ev.brandMult*0.8:ev.brandMult;
+    const box=document.createElement('div');
+    box.className='event-box';
+    box.style.borderColor=actualMult>=1?'var(--green)':'var(--red)';
+    box.innerHTML=`${ev.label} <span style="color:${actualMult>=1?'var(--green)':'var(--red)'};font-weight:700">× ${actualMult.toFixed(2)}</span>`;
+    list.appendChild(box);
+  });
+
+  yourValue*=eventMult;
+  aiValue*=(0.85+Math.random()*0.3);
+  history.push({season,yourValue:yourValue.toFixed(0),aiValue:aiValue.toFixed(0)});
+
+  document.getElementById('post-your-total').textContent='$'+yourValue.toFixed(0)+'M';
+  document.getElementById('post-ai-total').textContent='$'+aiValue.toFixed(0)+'M';
+  document.getElementById('next-season-btn').textContent=season>=3?'SEE FINAL RESULTS →':'NEXT SEASON →';
+}
+
+function generateEvents(){
+  const evs=[];
+  EVENTS.forEach(ev=>{
+    if(Math.random()<ev.prob){
+      if(!ev.forArchs||ev.forArchs.includes(archetype)){evs.push(ev);}
+    }
+  });
+  if(evs.length===0)evs.push({label:'📊 Steady season — no major events',brandMult:1.0});
+  return evs;
+}
+
+function nextSeason(){
+  document.getElementById('screen-events').classList.add('hidden');
+  if(season>=3){showOutcome();return;}
+  season++;
+  document.getElementById('screen-game').classList.remove('hidden');
+  loadSeason();
+}
+
+function showOutcome(){
+  document.getElementById('screen-outcome').classList.remove('hidden');
+  const won=yourValue>aiValue;
+  document.getElementById('outcome-emoji').textContent=won?'🏆':'📉';
+  document.getElementById('outcome-title').textContent=won?'BRAND EMPIRE BUILT!':'AI OUT-EARNED YOU';
+  document.getElementById('outcome-subtitle').textContent=won?`Your brand is worth $${yourValue.toFixed(0)}M vs AI's $${aiValue.toFixed(0)}M. You won!`:`AI's brand ($${aiValue.toFixed(0)}M) outpaced yours ($${yourValue.toFixed(0)}M). Try again.`;
+  document.getElementById('final-your').textContent='$'+yourValue.toFixed(0)+'M';
+  document.getElementById('final-ai').style.color=won?'var(--red)':'var(--green)';
+  document.getElementById('final-ai').textContent='$'+aiValue.toFixed(0)+'M';
+  document.getElementById('breakdown-content').innerHTML=history.map(h=>`<div class="stat-row"><span class="stat-label">Season ${h.season}</span><span>You: $${h.yourValue}M | AI: $${h.aiValue}M</span></div>`).join('');
+}
+</script>
+</body>
+</html>

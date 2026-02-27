@@ -1,0 +1,407 @@
+'use client';
+
+import { useState } from 'react';
+import { CAP_NIGHTMARE_SCENARIOS, REBUILD_TOOLS } from '@/data/capNightmareTeams';
+import type { CapNightmareScenario, CapPlayer } from '@/data/capNightmareTeams';
+import { calculateLuxuryTax, formatMoneyShort, stretchProvision } from '@/lib/CapMath';
+import MoraleBar from '@/components/shared/MoraleBar';
+import { HintBox } from '@/components/shared/TrackWrapper';
+
+type Phase = 'select' | 'year1' | 'year2' | 'year3' | 'verdict';
+
+interface RebuildState {
+  scenario: CapNightmareScenario | null;
+  players: CapPlayer[];
+  picks: Array<{ year: number; protected?: string; value: number }>;
+  totalSalary: number;
+  starMorale: number;
+  lockerRoomMorale: number;
+  winPct: number;
+  decisions: string[];
+  capHealth: number;
+  fanConfidence: number;
+  isTanking: boolean;
+}
+
+export default function DumpsterFirePage() {
+  const [track, setTrack] = useState<'5-6' | '7-8'>('5-6');
+  const [phase, setPhase] = useState<Phase>('select');
+  const [state, setState] = useState<RebuildState>({
+    scenario: null, players: [], picks: [], totalSalary: 0,
+    starMorale: 0, lockerRoomMorale: 0, winPct: 0,
+    decisions: [], capHealth: 0, fanConfidence: 50, isTanking: false,
+  });
+  const [selectedTool, setSelectedTool] = useState<string | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
+  const [actionLog, setActionLog] = useState<string[]>([]);
+  const [yearScores, setYearScores] = useState<Record<string, number>>({});
+
+  const isAdvanced = track === '7-8';
+
+  function selectScenario(scenario: CapNightmareScenario) {
+    setState({
+      scenario,
+      players: [...scenario.players],
+      picks: [...scenario.startingCapSituation.picks],
+      totalSalary: scenario.startingCapSituation.totalSalary,
+      starMorale: scenario.starMorale,
+      lockerRoomMorale: scenario.lockerRoomMorale,
+      winPct: scenario.winPct,
+      decisions: [],
+      capHealth: 0,
+      fanConfidence: 50,
+      isTanking: false,
+    });
+    setActionLog([]);
+    setPhase('year1');
+  }
+
+  function applyTool(tool: string, playerId: string) {
+    const player = state.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    let newPlayers = [...state.players];
+    let newSalary = state.totalSalary;
+    let newMorale = state.lockerRoomMorale;
+    let newStarMorale = state.starMorale;
+    let newWinPct = state.winPct;
+    let logEntry = '';
+
+    switch (tool) {
+      case 'trade': {
+        // Trade: remove player, gain minor value, reduce salary
+        const tradeValue = player.tradeValue;
+        newPlayers = newPlayers.filter(p => p.id !== playerId);
+        newSalary -= player.salary;
+        newMorale += player.moraleImpact > 0 ? -5 : 5; // lose a good guy = morale drops, lose cancer = morale up
+        newWinPct -= player.rating / 1000;
+        logEntry = `✓ TRADED ${player.name} (${formatMoneyShort(player.salary)}/yr). Trade value was ${tradeValue}/10. Cap freed: ${formatMoneyShort(player.salary)}/yr.`;
+        break;
+      }
+      case 'stretch': {
+        if (!player.canBeStretched) { alert(`${player.name}'s contract cannot be stretched.`); return; }
+        const { yearsSpread, perYearAmount } = stretchProvision(player.salary, player.yearsLeft);
+        newPlayers = newPlayers.filter(p => p.id !== playerId);
+        newSalary = newSalary - player.salary + perYearAmount;
+        logEntry = `📅 STRETCHED ${player.name}. Spread $${(player.salary * player.yearsLeft).toFixed(0)}M over ${yearsSpread} years = ${formatMoneyShort(perYearAmount)}/yr.`;
+        break;
+      }
+      case 'buyout': {
+        if (!player.canBeBoughtOut) { alert(`${player.name} refused buyout terms.`); return; }
+        const buyoutPenalty = player.salary * 0.3;
+        newSalary = newSalary - player.salary + buyoutPenalty;
+        newPlayers = newPlayers.filter(p => p.id !== playerId);
+        logEntry = `💸 BOUGHT OUT ${player.name}. Eating ${formatMoneyShort(buyoutPenalty)} dead money. He is now a free agent.`;
+        break;
+      }
+      case 'tank': {
+        setState(s => ({ ...s, isTanking: !s.isTanking }));
+        logEntry = state.isTanking ? '🎯 STOPPED TANKING — Competing again.' : '🎯 ENTERED TANK MODE — Sacrificing wins for draft position.';
+        setActionLog(prev => [...prev, logEntry]);
+        setSelectedTool(null);
+        setSelectedPlayer(null);
+        return;
+      }
+      default:
+        return;
+    }
+
+    newMorale = Math.max(0, Math.min(100, newMorale));
+    newStarMorale -= player.moraleImpact > 2 ? 10 : 0;
+    newStarMorale = Math.max(0, Math.min(100, newStarMorale));
+
+    setState(s => ({
+      ...s,
+      players: newPlayers,
+      totalSalary: newSalary,
+      lockerRoomMorale: newMorale,
+      starMorale: newStarMorale,
+      winPct: newWinPct,
+    }));
+    setActionLog(prev => [...prev, logEntry]);
+    setSelectedTool(null);
+    setSelectedPlayer(null);
+  }
+
+  function advanceYear(year: 'year1' | 'year2') {
+    const capHealth = Math.max(0, 100 - (state.totalSalary - (state.scenario?.startingCapSituation.capLine || 140)) * 2);
+    const competitiveness = Math.round(state.winPct * 100);
+    const tanking = state.isTanking ? 10 : 0;
+    setYearScores(prev => ({ ...prev, [year]: Math.round((capHealth + competitiveness + tanking) / 3) }));
+
+    if (year === 'year1') setPhase('year2');
+    else setPhase('year3');
+  }
+
+  function calculateFinalScore() {
+    const capHealth = Math.max(0, Math.min(100, 100 - (state.totalSalary - 140) * 3));
+    const taxBill = calculateLuxuryTax(state.totalSalary);
+    const taxScore = taxBill === 0 ? 100 : Math.max(0, 100 - taxBill * 5);
+    const competitiveness = Math.round(state.winPct * 100) + (state.isTanking ? 20 : 0);
+    const futureAssets = state.picks.length * 15;
+    return {
+      capHealth: Math.round((capHealth + taxScore) / 2),
+      competitiveness: Math.min(100, competitiveness),
+      futureAssets: Math.min(100, futureAssets),
+      taxBill,
+    };
+  }
+
+  if (phase === 'select') {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center gap-3 mb-6 p-3 bg-[#111827] rounded-xl border border-[#1e293b]">
+          <span className="text-xs text-[#64748b] uppercase tracking-widest">Grade Level:</span>
+          {(['5-6', '7-8'] as const).map(t => (
+            <button key={t} onClick={() => setTrack(t)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${track === t ? 'bg-[#f59e0b] text-black' : 'bg-[#1a2035] text-[#64748b]'}`}>
+              {t === '5-6' ? '5th–6th Grade' : '7th–8th (Hard)'}
+            </button>
+          ))}
+        </div>
+
+        <div className="mb-6">
+          <h1 className="text-3xl font-black text-white mb-1">🔥 THE DUMPSTER FIRE</h1>
+          <p className="text-[#64748b]">Inherit a cap nightmare. Fix it over 3 years. Don&apos;t let it get worse.</p>
+        </div>
+
+        {!isAdvanced && (
+          <HintBox>
+            You&apos;re going to take over a real team&apos;s worst financial situation. You have tools: Trade, Stretch, Buyout, and more. Every decision has consequences — choose carefully over 3 years.
+          </HintBox>
+        )}
+
+        <div className="grid gap-4">
+          {CAP_NIGHTMARE_SCENARIOS.map(s => {
+            const tax = calculateLuxuryTax(s.startingCapSituation.totalSalary);
+            return (
+              <button
+                key={s.id}
+                onClick={() => selectScenario(s)}
+                className="text-left p-5 bg-[#1a2035] rounded-xl border border-[#1e293b] hover:border-[#ef4444] transition-all group"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <div className="text-white font-bold text-lg group-hover:text-[#ef4444] transition-colors">{s.title}</div>
+                    <div className="text-[#64748b] text-xs">{s.year} · {s.teamAbbr}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-red-400 font-black text-lg">{formatMoneyShort(s.startingCapSituation.totalSalary)}</div>
+                    <div className="text-xs text-[#64748b]">Total Payroll</div>
+                    {tax > 0 && <div className="text-xs text-red-500">+{formatMoneyShort(tax)} tax</div>}
+                  </div>
+                </div>
+                <p className="text-[#94a3b8] text-sm mb-3">{s.subtitle}</p>
+                <div className="flex gap-3">
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${s.starWantsOut ? 'bg-red-900/30 text-red-400' : 'bg-green-900/30 text-green-400'}`}>
+                    {s.starWantsOut ? '🔥 Star wants out' : '✓ Star committed'}
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#1a2035] text-[#64748b]">
+                    {s.startingCapSituation.picks.length} picks left
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (!state.scenario) return null;
+
+  const currentYear = phase === 'year1' ? 'Year 1' : phase === 'year2' ? 'Year 2' : 'Year 3';
+  const taxBill = calculateLuxuryTax(state.totalSalary);
+
+  const phaseContent = (
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={() => setPhase('select')} className="text-[#64748b] hover:text-white text-sm">← Exit</button>
+        <div>
+          <h1 className="text-xl font-black text-white">{state.scenario.title}</h1>
+          <p className="text-[#64748b] text-xs">{currentYear} of 3</p>
+        </div>
+        <div className="ml-auto flex gap-1">
+          {(['year1', 'year2', 'year3'] as const).map((y, i) => (
+            <div key={y} className={`w-8 h-1.5 rounded-full ${phase === y ? 'bg-[#f59e0b]' : i < ['year1','year2','year3'].indexOf(phase) ? 'bg-[#10b981]' : 'bg-[#1e293b]'}`} />
+          ))}
+        </div>
+      </div>
+
+      {/* Situation dashboard */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        {[
+          { label: 'Total Salary', value: formatMoneyShort(state.totalSalary), color: state.totalSalary > 170 ? '#ef4444' : state.totalSalary > 140 ? '#f59e0b' : '#10b981' },
+          { label: 'Luxury Tax', value: taxBill > 0 ? `+${formatMoneyShort(taxBill)}` : 'NONE', color: taxBill > 0 ? '#ef4444' : '#10b981' },
+          { label: 'Win %', value: `${(state.winPct * 100).toFixed(1)}%`, color: state.winPct > 0.5 ? '#10b981' : state.winPct > 0.35 ? '#f59e0b' : '#ef4444' },
+          { label: 'Draft Picks', value: String(state.picks.length), color: state.picks.length >= 2 ? '#10b981' : state.picks.length === 1 ? '#f59e0b' : '#ef4444' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="bg-[#111827] rounded-xl border border-[#1e293b] p-3 text-center">
+            <div className="font-black text-lg" style={{ color }}>{value}</div>
+            <div className="text-xs text-[#64748b]">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <MoraleBar value={state.starMorale} label="Star Morale" size="md" />
+        <MoraleBar value={state.lockerRoomMorale} label="Locker Room" size="md" />
+      </div>
+
+      {state.isTanking && (
+        <div className="mb-4 p-3 bg-orange-900/20 border border-orange-700 rounded-xl text-sm text-orange-400 flex items-center gap-2">
+          🎯 TANK MODE ACTIVE — Win% dropped, lottery odds improving. Morale draining.
+        </div>
+      )}
+
+      {state.starMorale < 30 && (
+        <div className="mb-4 p-3 bg-red-900/20 border border-red-700 rounded-xl text-sm text-red-400 flex items-center gap-2">
+          🔥 CRISIS — Star morale critical! If it hits 0%, they demand a trade publicly, crashing their trade value.
+        </div>
+      )}
+
+      {!isAdvanced && phase === 'year1' && (
+        <HintBox>
+          Use the tools on the right to fix this situation. Click a tool, then click a player to apply it. Each action has tradeoffs — trading a good player helps the cap but hurts the team.
+        </HintBox>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Player list */}
+        <div className="lg:col-span-2">
+          <div className="text-xs text-[#64748b] uppercase tracking-widest mb-3">Current Roster</div>
+          <div className="space-y-2">
+            {state.players.map(player => (
+              <div
+                key={player.id}
+                onClick={() => selectedTool && applyTool(selectedTool, player.id)}
+                className={`p-3 rounded-xl border transition-all ${selectedTool ? 'cursor-pointer hover:border-[#f59e0b]' : ''} ${selectedPlayer === player.id ? 'border-[#f59e0b] bg-[#2a1f00]' : 'border-[#1e293b] bg-[#111827]'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-[#64748b] w-6">{player.position}</span>
+                    <div>
+                      <div className="text-sm font-bold text-white">{player.name}</div>
+                      <div className="text-xs text-[#64748b]">Age {player.age} · {player.yearsLeft}yr left</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-[#3b82f6]">{player.rating} OVR</span>
+                    <span className="text-[#f59e0b] font-bold">{formatMoneyShort(player.salary)}/yr</span>
+                    {isAdvanced && (
+                      <span style={{ color: player.tradeValue >= 7 ? '#10b981' : player.tradeValue >= 4 ? '#f59e0b' : '#ef4444' }}>
+                        TV: {player.tradeValue}/10
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {!isAdvanced && player.canBeBoughtOut && <div className="text-xs text-green-400 mt-1">✓ Buyout eligible</div>}
+                {!isAdvanced && player.canBeStretched && <div className="text-xs text-blue-400 mt-1">✓ Stretch eligible</div>}
+                {selectedTool && <div className="text-xs text-[#f59e0b] mt-1">Click to apply {selectedTool.toUpperCase()}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Tools panel */}
+        <div>
+          <div className="text-xs text-[#64748b] uppercase tracking-widest mb-3">GM Tools</div>
+          <div className="space-y-2 mb-6">
+            {REBUILD_TOOLS.map(tool => (
+              <button
+                key={tool.id}
+                onClick={() => setSelectedTool(selectedTool === tool.id ? null : tool.id)}
+                className={`w-full text-left p-3 rounded-xl border transition-all ${selectedTool === tool.id ? 'border-[#f59e0b] bg-[#2a1f00]' : 'border-[#1e293b] bg-[#111827] hover:border-[#64748b]'}`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span>{tool.icon}</span>
+                  <span className="text-sm font-bold text-white">{tool.name}</span>
+                </div>
+                {!isAdvanced && <p className="text-xs text-[#64748b]">{tool.description}</p>}
+              </button>
+            ))}
+          </div>
+
+          {/* Action log */}
+          {actionLog.length > 0 && (
+            <div className="bg-[#0a0e1a] rounded-xl border border-[#1e293b] p-3">
+              <div className="text-xs text-[#64748b] font-bold mb-2">ACTION LOG</div>
+              <div className="space-y-1 max-h-36 overflow-y-auto">
+                {actionLog.map((log, i) => <div key={i} className="text-xs text-[#94a3b8]">{log}</div>)}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-6 flex justify-end">
+        {phase !== 'year3' ? (
+          <button
+            onClick={() => advanceYear(phase as 'year1' | 'year2')}
+            className="px-8 py-3 bg-[#f59e0b] text-black font-black rounded-xl hover:bg-[#fbbf24]"
+          >
+            END {currentYear.toUpperCase()} →
+          </button>
+        ) : (
+          <button
+            onClick={() => setPhase('verdict')}
+            className="px-8 py-3 bg-[#10b981] text-black font-black rounded-xl"
+          >
+            SEE FINAL VERDICT →
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  if (phase !== 'verdict') return phaseContent;
+
+  // VERDICT
+  const scores = calculateFinalScore();
+  const overall = Math.round((scores.capHealth + scores.competitiveness + scores.futureAssets) / 3);
+  const grade = overall >= 80 ? 'A' : overall >= 65 ? 'B' : overall >= 50 ? 'C' : overall >= 35 ? 'D' : 'F';
+  const gradeColor = grade === 'A' ? '#10b981' : grade === 'B' ? '#f59e0b' : grade === 'C' ? '#3b82f6' : '#ef4444';
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      <h1 className="text-3xl font-black text-white mb-6">3-Year Rebuild Verdict</h1>
+
+      <div className="text-center mb-6 p-6 bg-[#111827] rounded-xl border-2" style={{ borderColor: gradeColor }}>
+        <div className="text-8xl font-black mb-2" style={{ color: gradeColor }}>{grade}</div>
+        <div className="text-2xl text-white font-bold">{overall}/100</div>
+        <div className="text-[#64748b] text-sm mt-2">Your Rebuild Score</div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {[
+          { label: 'Cap Health', score: scores.capHealth, desc: 'Did you clear tax space?' },
+          { label: 'Competitiveness', score: scores.competitiveness, desc: 'Win % trajectory' },
+          { label: 'Future Assets', score: scores.futureAssets, desc: 'Picks & young players' },
+        ].map(({ label, score, desc }) => (
+          <div key={label} className="bg-[#1a2035] rounded-xl border border-[#1e293b] p-3 text-center">
+            <div className="text-2xl font-black" style={{ color: score >= 70 ? '#10b981' : score >= 40 ? '#f59e0b' : '#ef4444' }}>{score}</div>
+            <div className="text-sm font-bold text-white">{label}</div>
+            <div className="text-xs text-[#64748b]">{desc}</div>
+          </div>
+        ))}
+      </div>
+
+      {state.scenario && (
+        <div className="p-5 bg-[#111827] rounded-xl border border-[#1e293b] mb-6">
+          <div className="text-xs text-[#f59e0b] font-bold mb-3">📰 What the Real GM Did</div>
+          <p className="text-[#e2e8f0] text-sm mb-3">{state.scenario.realOutcome.summary}</p>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[#64748b]">Real GM Score</span>
+            <span className="text-[#3b82f6] font-bold">{state.scenario.realOutcome.score}/100</span>
+          </div>
+          <div className="text-xs mt-1" style={{ color: overall >= state.scenario.realOutcome.score ? '#10b981' : '#ef4444' }}>
+            {overall >= state.scenario.realOutcome.score ? `🏆 You outperformed the real GM!` : `The real GM scored ${state.scenario.realOutcome.score - overall} points higher.`}
+          </div>
+        </div>
+      )}
+
+      <button onClick={() => setPhase('select')} className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl">
+        TRY ANOTHER SCENARIO
+      </button>
+    </div>
+  );
+}

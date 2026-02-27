@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fill My Building — BSC</title>
+<style>
+  :root{--bg:#0a0e1a;--surface:#111827;--card:#1a2035;--border:#1e293b;--accent:#f59e0b;--green:#10b981;--red:#ef4444;--blue:#3b82f6;--text:#e2e8f0;--muted:#64748b}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min-height:100vh}
+  .nav{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:12px}
+  .nav a{color:var(--muted);text-decoration:none;font-size:13px}.nav a:hover{color:var(--accent)}
+  .logo{color:var(--accent);font-weight:900;font-size:18px}
+  .container{max-width:900px;margin:0 auto;padding:32px 16px}
+  h1{font-size:32px;font-weight:900;margin-bottom:8px}
+  h2{font-size:16px;font-weight:700;margin-bottom:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .subtitle{color:var(--muted);margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center}
+  .stat-val{font-size:22px;font-weight:900;margin-bottom:4px}
+  .stat-label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  .slider-group{margin-bottom:20px}
+  .slider-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px}
+  .slider-label .val{font-weight:700;color:var(--accent)}
+  input[type=range]{width:100%;accent-color:var(--accent);margin-bottom:4px}
+  .slider-desc{color:var(--muted);font-size:11px}
+  .btn{background:var(--accent);color:#000;font-weight:900;border:none;border-radius:10px;padding:12px 24px;cursor:pointer;font-size:15px;transition:.2s;width:100%}
+  .btn:hover{opacity:.9}
+  .event-card{border-radius:10px;padding:12px 16px;margin-bottom:8px;border:1px solid var(--border);font-size:13px;display:flex;align-items:center;gap:10px}
+  .event-card.positive{background:#052e16;border-color:#16a34a}
+  .event-card.negative{background:#450a0a;border-color:#b91c1c}
+  .event-card.neutral{background:var(--surface)}
+  .month-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+  .month-cell{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;font-size:12px}
+  .month-cell .label{color:var(--muted);font-size:10px;margin-bottom:2px}
+  .month-cell .val{font-weight:700}
+  .arena-vis{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px}
+  .arena-section{height:40px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;transition:background .4s}
+  .progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:4px}
+  .progress-fill{height:100%;border-radius:4px;transition:width .6s}
+  .hidden{display:none}
+  .green{color:var(--green)}.red{color:var(--red)}.accent{color:var(--accent)}.blue{color:var(--blue)}
+  select{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="logo">BSC</a>
+  <span style="color:var(--border)">|</span>
+  <a href="/">← Back to Hub</a>
+</nav>
+
+<div class="container">
+
+<!-- INTRO -->
+<div id="screen-intro">
+  <div style="text-align:center;margin-bottom:32px">
+    <div style="font-size:64px;margin-bottom:16px">🏟️</div>
+    <h1>FILL MY BUILDING</h1>
+    <p class="subtitle">You run the arena. Set prices. Book events. Fill seats. But greedy pricing kills attendance.</p>
+  </div>
+
+  <div class="card">
+    <h2>The Challenge</h2>
+    <p style="color:#94a3b8;font-size:14px;line-height:1.7">
+      You own an NBA arena. For one full season, you control ticket prices, concession markup, parking, and special events.
+      <br><br>
+      But the demand curve is real: <strong>raise prices too much → attendance drops → revenue drops</strong>.
+      You also face random events that shake up your entire season.
+      <br><br>
+      Beat the AI arena manager running a rival venue in the same city.
+    </p>
+  </div>
+
+  <div class="card" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+    <div style="text-align:center">
+      <div style="font-size:28px;margin-bottom:4px">🎟️</div>
+      <div style="font-weight:700;font-size:13px">Ticket Pricing</div>
+      <div style="color:var(--muted);font-size:11px">3 tiers: floor, bowl, upper</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:28px;margin-bottom:4px">🌮</div>
+      <div style="font-weight:700;font-size:13px">Concessions</div>
+      <div style="color:var(--muted);font-size:11px">Markup affects fan satisfaction</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:28px;margin-bottom:4px">🎭</div>
+      <div style="font-weight:700;font-size:13px">Special Events</div>
+      <div style="color:var(--muted);font-size:11px">Boost attendance on key nights</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:16px">
+    <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:8px">Grade Level:</label>
+    <select id="track-sel" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px">
+      <option value="easy">5th–6th Grade (with hints)</option>
+      <option value="hard">7th–8th Grade (Hard Mode)</option>
+    </select>
+  </div>
+
+  <button class="btn" onclick="startGame()">OPEN THE ARENA →</button>
+</div>
+
+<!-- PRICING SCREEN -->
+<div id="screen-pricing" class="hidden">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Month <span id="month-num">1</span> of 4</div>
+      <h1 style="font-size:24px">Set Your Prices</h1>
+    </div>
+    <div style="text-align:right">
+      <div id="projected-rev" style="font-size:22px;font-weight:900;color:var(--accent)">$0</div>
+      <div style="color:var(--muted);font-size:12px">Projected Revenue</div>
+    </div>
+  </div>
+
+  <div id="hint-pricing" class="card" style="border-left:4px solid var(--blue);margin-bottom:16px">
+    <div style="color:var(--blue);font-weight:700;font-size:12px;margin-bottom:4px">💡 GUIDE</div>
+    <div style="font-size:13px;color:#94a3b8">Move the sliders to set your prices. Watch the Projected Revenue update in real time. If you price too high, the attendance bar will drop — fewer people = less money even at higher prices.</div>
+  </div>
+
+  <!-- Arena visualization -->
+  <div class="arena-vis">
+    <div class="arena-section" id="floor-section" style="background:#1a3a1a">🏀 FLOOR SEATS</div>
+    <div class="arena-section" id="bowl-section" style="background:#1a2a3a">⬛ LOWER BOWL</div>
+    <div class="arena-section" id="upper-section" style="background:#1a1a2a">⬜ UPPER DECK</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="card">
+      <h2>Ticket Prices</h2>
+      <div class="slider-group">
+        <div class="slider-label"><span>🏀 Floor Seats</span><span class="val" id="val-floor">$350</span></div>
+        <input type="range" min="100" max="800" value="350" id="sl-floor" oninput="updatePricing()">
+        <div class="slider-desc">High demand, limited seats (200). Price sensitive above $600.</div>
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>⬛ Lower Bowl</span><span class="val" id="val-bowl">$120</span></div>
+        <input type="range" min="40" max="300" value="120" id="sl-bowl" oninput="updatePricing()">
+        <div class="slider-desc">Main seating (8,000 seats). Sweet spot $80–$180.</div>
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>⬜ Upper Deck</span><span class="val" id="val-upper">$45</span></div>
+        <input type="range" min="15" max="120" value="45" id="sl-upper" oninput="updatePricing()">
+        <div class="slider-desc">Budget seats (10,000). Families and students. Keep affordable.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Concessions & Parking</h2>
+      <div class="slider-group">
+        <div class="slider-label"><span>🌮 Concession Markup</span><span class="val" id="val-conc">150%</span></div>
+        <input type="range" min="50" max="400" value="150" id="sl-conc" oninput="updatePricing()">
+        <div class="slider-desc">% above cost. 150% = beer that costs $3 sells for $7.50. Fans notice above 250%.</div>
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>🅿️ Parking</span><span class="val" id="val-park">$25</span></div>
+        <input type="range" min="5" max="80" value="25" id="sl-park" oninput="updatePricing()">
+        <div class="slider-desc">3,000 spots. Fans hate over $50. Many will Uber if you overprice.</div>
+      </div>
+
+      <h2 style="margin-top:16px">Special Events</h2>
+      <div id="events-list" style="display:grid;gap:8px"></div>
+    </div>
+  </div>
+
+  <!-- Live projections -->
+  <div class="card">
+    <h2>Live Projections (10 Games This Month)</h2>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-val green" id="proj-att">18,200</div><div class="stat-label">Avg Attendance</div></div>
+      <div class="stat-card"><div class="stat-val accent" id="proj-ticket">$0</div><div class="stat-label">Ticket Revenue</div></div>
+      <div class="stat-card"><div class="stat-val blue" id="proj-conc">$0</div><div class="stat-label">Concession Rev</div></div>
+      <div class="stat-card"><div class="stat-val" id="proj-sat">75%</div><div class="stat-label">Fan Satisfaction</div></div>
+    </div>
+    <div style="margin-top:8px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--muted)">Attendance Fill Rate</span><span id="fill-pct">94%</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="fill-bar" style="width:94%;background:var(--green)"></div></div>
+    </div>
+  </div>
+
+  <button class="btn" onclick="lockPricing()">LOCK PRICES — SIMULATE MONTH →</button>
+</div>
+
+<!-- EVENTS SCREEN -->
+<div id="screen-events" class="hidden">
+  <h1>Month <span id="ev-month">1</span> Results</h1>
+  <p class="subtitle">Here's what happened this month in your arena.</p>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-val green" id="ev-att">0</div><div class="stat-label">Total Attendance</div></div>
+    <div class="stat-card"><div class="stat-val accent" id="ev-rev">$0</div><div class="stat-label">Revenue</div></div>
+    <div class="stat-card"><div class="stat-val" id="ev-sat">0%</div><div class="stat-label">Fan Satisfaction</div></div>
+    <div class="stat-card"><div class="stat-val" id="ev-season">$0</div><div class="stat-label">Season Total</div></div>
+  </div>
+
+  <div id="events-fired" style="margin-bottom:16px"></div>
+
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <div><div style="font-size:12px;color:var(--muted)">AI Rival This Month</div><div id="ai-rev" style="font-weight:700;color:var(--red);font-size:18px">$0</div></div>
+    <div id="comp-result" style="font-size:13px"></div>
+  </div>
+
+  <button class="btn" id="next-month-btn" onclick="nextMonth()">NEXT MONTH →</button>
+</div>
+
+<!-- OUTCOME SCREEN -->
+<div id="screen-outcome" class="hidden">
+  <div style="text-align:center;margin-bottom:32px">
+    <div style="font-size:64px;margin-bottom:16px" id="out-emoji">🏆</div>
+    <h1 id="out-title">Arena Report Card</h1>
+    <p id="out-subtitle" class="subtitle"></p>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-val green" id="out-total-rev">$0</div><div class="stat-label">Total Revenue</div></div>
+    <div class="stat-card"><div class="stat-val" id="out-avg-att">0</div><div class="stat-label">Avg Attendance</div></div>
+    <div class="stat-card"><div class="stat-val" id="out-sat">0%</div><div class="stat-label">Final Satisfaction</div></div>
+    <div class="stat-card"><div class="stat-val red" id="out-ai-rev">$0</div><div class="stat-label">AI Revenue</div></div>
+  </div>
+
+  <div class="card" id="grade-card">
+    <h2>Season Grade</h2>
+    <div style="text-align:center">
+      <div id="grade-letter" style="font-size:80px;font-weight:900;margin-bottom:8px"></div>
+      <div id="grade-desc" style="color:var(--muted);font-size:14px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Month-by-Month History</h2>
+    <div class="month-grid" id="history-grid"></div>
+  </div>
+
+  <button class="btn" onclick="location.reload()">RUN ANOTHER SEASON</button>
+</div>
+
+</div>
+<script>
+const MONTH_NAMES=['October–November','December–January','February–March','April (Playoffs Push)'];
+const SPECIAL_EVENTS=[
+  {id:'retire',name:'Jersey Retirement Night',boost:1.25,cost:50000},
+  {id:'fireworks',name:'Post-Game Fireworks',boost:1.12,cost:20000},
+  {id:'bobblehead',name:'Bobblehead Giveaway',boost:1.18,cost:30000},
+  {id:'kids',name:'Kids Day (U12 Free)',boost:1.08,cost:15000},
+];
+const RANDOM_EVENTS=[
+  {id:'losing',label:'📉 Team on 7-game losing streak',attMult:.85,satMult:.9,prob:.3},
+  {id:'rival',label:'🔥 Rival team visiting — sellout demand',attMult:1.15,satMult:1.05,prob:.25},
+  {id:'maintenance',label:'🔧 Scoreboard malfunction — $80K repair',revPenalty:80000,prob:.15},
+  {id:'food-viral',label:'🌮 Viral food item — concessions spike',concMult:1.3,prob:.3},
+  {id:'star-injury',label:'🏥 Star player injured — soft demand',attMult:.88,prob:.2},
+  {id:'playoff-race',label:'🏆 Team in playoff race — buzz!',attMult:1.1,satMult:1.08,prob:.25},
+];
+
+let track='easy',month=0,totalRev=0,totalAiRev=0,avgSat=75,history=[],selectedEvents=[];
+
+function startGame(){
+  track=document.getElementById('track-sel').value;
+  document.getElementById('screen-intro').classList.add('hidden');
+  document.getElementById('screen-pricing').classList.remove('hidden');
+  loadMonth();
+}
+
+function loadMonth(){
+  document.getElementById('month-num').textContent=month+1;
+  document.getElementById('hint-pricing').style.display=track==='easy'?'block':'none';
+  renderEventOptions();
+  updatePricing();
+}
+
+function renderEventOptions(){
+  const list=document.getElementById('events-list');
+  list.innerHTML='';
+  SPECIAL_EVENTS.forEach(ev=>{
+    const isSelected=selectedEvents.includes(ev.id);
+    const div=document.createElement('div');
+    div.style.cssText=`display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;border:1px solid ${isSelected?'var(--accent)':'var(--border)'};background:${isSelected?'#2a1f00':'var(--surface)'};cursor:pointer;font-size:12px;transition:.2s`;
+    div.onclick=()=>toggleEvent(ev.id);
+    div.innerHTML=`<span>${ev.name}</span><span style="color:var(--muted)">+${((ev.boost-1)*100).toFixed(0)}% att · $${(ev.cost/1000).toFixed(0)}k cost</span>`;
+    list.appendChild(div);
+  });
+}
+
+function toggleEvent(id){
+  selectedEvents=selectedEvents.includes(id)?selectedEvents.filter(x=>x!==id):[...selectedEvents,id];
+  renderEventOptions();
+  updatePricing();
+}
+
+function updatePricing(){
+  const floor=+document.getElementById('sl-floor').value;
+  const bowl=+document.getElementById('sl-bowl').value;
+  const upper=+document.getElementById('sl-upper').value;
+  const conc=+document.getElementById('sl-conc').value;
+  const park=+document.getElementById('sl-park').value;
+
+  document.getElementById('val-floor').textContent='$'+floor;
+  document.getElementById('val-bowl').textContent='$'+bowl;
+  document.getElementById('val-upper').textContent='$'+upper;
+  document.getElementById('val-conc').textContent=conc+'%';
+  document.getElementById('val-park').textContent='$'+park;
+
+  // Demand curves
+  const floorAtt=Math.round(200*Math.max(0,1-(floor-350)/800));
+  const bowlAtt=Math.round(8000*Math.max(0,1-(bowl-80)/300));
+  const upperAtt=Math.round(10000*Math.max(0,1-(upper-20)/130));
+  const totalAtt=floorAtt+bowlAtt+upperAtt;
+  const fillPct=Math.round(totalAtt/18200*100);
+
+  const eventBoost=selectedEvents.reduce((acc,id)=>{const ev=SPECIAL_EVENTS.find(e=>e.id===id);return acc*(ev?ev.boost:1);},1);
+  const finalAtt=Math.round(totalAtt*eventBoost);
+
+  const ticketRev=(floorAtt*floor+bowlAtt*bowl+upperAtt*upper)*10; // 10 games
+  const concRev=Math.round(finalAtt*10*(conc/100)*3.5); // avg $3.50 base
+  const parkRev=Math.round(Math.min(3000,finalAtt/6)*park*10);
+  const eventCost=selectedEvents.reduce((s,id)=>{const ev=SPECIAL_EVENTS.find(e=>e.id===id);return s+(ev?ev.cost:0);},0)*10;
+  const totalProjRev=ticketRev+concRev+parkRev-eventCost;
+
+  const sat=Math.round(Math.max(0,100-(floor-300)/10-(conc-150)/8-(park-30)/3));
+
+  document.getElementById('proj-att').textContent=finalAtt.toLocaleString();
+  document.getElementById('proj-ticket').textContent='$'+Math.round(ticketRev/1000)+'K';
+  document.getElementById('proj-conc').textContent='$'+Math.round(concRev/1000)+'K';
+  document.getElementById('proj-sat').textContent=sat+'%';
+  document.getElementById('projected-rev').textContent='$'+Math.round(totalProjRev/1000)+'K';
+  document.getElementById('fill-pct').textContent=Math.min(100,fillPct*Math.round(eventBoost*10)/10)+'%';
+  document.getElementById('fill-bar').style.width=Math.min(100,fillPct)+'%';
+  document.getElementById('fill-bar').style.background=fillPct>80?'var(--green)':fillPct>50?'var(--accent)':'var(--red)';
+
+  // Arena visualization
+  document.getElementById('floor-section').style.background=floorAtt>150?'#1a3a1a':'#3a1a1a';
+  document.getElementById('bowl-section').style.background=bowlAtt>6000?'#1a2a3a':'#2a1a3a';
+  document.getElementById('upper-section').style.background=upperAtt>7000?'#1a1a2a':'#2a1a1a';
+}
+
+function lockPricing(){
+  const floor=+document.getElementById('sl-floor').value;
+  const bowl=+document.getElementById('sl-bowl').value;
+  const upper=+document.getElementById('sl-upper').value;
+  const conc=+document.getElementById('sl-conc').value;
+  const park=+document.getElementById('sl-park').value;
+
+  const floorAtt=Math.round(200*Math.max(0,1-(floor-350)/800));
+  const bowlAtt=Math.round(8000*Math.max(0,1-(bowl-80)/300));
+  const upperAtt=Math.round(10000*Math.max(0,1-(upper-20)/130));
+  const eventBoost=selectedEvents.reduce((acc,id)=>{const ev=SPECIAL_EVENTS.find(e=>e.id===id);return acc*(ev?ev.boost:1);},1);
+  const totalAtt=Math.round((floorAtt+bowlAtt+upperAtt)*eventBoost);
+
+  // Fire random events
+  const fired=[];
+  let attMult=1,satMult=1,concMultiplier=1,revPenalty=0;
+  RANDOM_EVENTS.forEach(ev=>{
+    if(Math.random()<ev.prob){
+      fired.push(ev);
+      if(ev.attMult)attMult*=ev.attMult;
+      if(ev.satMult)satMult*=ev.satMult;
+      if(ev.concMult)concMultiplier*=ev.concMult;
+      if(ev.revPenalty)revPenalty+=ev.revPenalty;
+    }
+  });
+
+  const finalAtt=Math.round(totalAtt*attMult);
+  const sat=Math.round(Math.max(0,(100-(floor-300)/10-(conc-150)/8)*satMult));
+  const ticketRev=Math.round((floorAtt*floor+bowlAtt*bowl+upperAtt*upper)*10*attMult);
+  const concRev=Math.round(finalAtt*10*(conc/100)*3.5*concMultiplier);
+  const parkRev=Math.round(Math.min(3000,finalAtt/6)*park*10);
+  const eventCost=selectedEvents.reduce((s,id)=>{const ev=SPECIAL_EVENTS.find(e=>e.id===id);return s+(ev?ev.cost:0);},0)*10;
+  const monthRev=ticketRev+concRev+parkRev-eventCost-revPenalty;
+  const aiMonthRev=Math.round(500000+Math.random()*300000);
+
+  totalRev+=monthRev;
+  totalAiRev+=aiMonthRev;
+  avgSat=Math.round((avgSat+sat)/2);
+  history.push({month:month+1,att:finalAtt,rev:monthRev,sat,ai:aiMonthRev});
+  selectedEvents=[];
+
+  document.getElementById('screen-pricing').classList.add('hidden');
+  document.getElementById('screen-events').classList.remove('hidden');
+  document.getElementById('ev-month').textContent=month+1;
+  document.getElementById('ev-att').textContent=finalAtt.toLocaleString();
+  document.getElementById('ev-rev').textContent='$'+Math.round(monthRev/1000)+'K';
+  document.getElementById('ev-sat').textContent=sat+'%';
+  document.getElementById('ev-season').textContent='$'+Math.round(totalRev/1000)+'K';
+  document.getElementById('ai-rev').textContent='$'+Math.round(aiMonthRev/1000)+'K';
+  document.getElementById('comp-result').innerHTML=monthRev>aiMonthRev?'<span style="color:var(--green)">✓ You beat the AI this month!</span>':'<span style="color:var(--red)">✗ AI arena out-earned you this month.</span>';
+
+  const eventsList=document.getElementById('events-fired');
+  eventsList.innerHTML='';
+  if(fired.length===0){
+    eventsList.innerHTML='<div class="event-card neutral">📊 Routine month — no major events.</div>';
+  } else fired.forEach(ev=>{
+    const div=document.createElement('div');
+    div.className='event-card '+(ev.attMult&&ev.attMult>1||ev.satMult&&ev.satMult>1?'positive':ev.revPenalty?'negative':'neutral');
+    div.textContent=ev.label;
+    eventsList.appendChild(div);
+  });
+
+  document.getElementById('next-month-btn').textContent=month>=3?'SEE FINAL REPORT →':'NEXT MONTH →';
+}
+
+function nextMonth(){
+  month++;
+  document.getElementById('screen-events').classList.add('hidden');
+  if(month>=4){showOutcome();return;}
+  document.getElementById('screen-pricing').classList.remove('hidden');
+  loadMonth();
+}
+
+function showOutcome(){
+  document.getElementById('screen-outcome').classList.remove('hidden');
+  const won=totalRev>totalAiRev;
+  const grade=totalRev>3000000?'A':totalRev>2000000?'B':totalRev>1500000?'C':totalRev>900000?'D':'F';
+  const gradeDescs={'A':'Elite arena management. Sold out and profitable.','B':'Solid performance. Good balance of revenue and fan experience.','C':'Average. Pricing could be improved.','D':'Struggling. Fans unhappy or seats empty.','F':'Arena in financial trouble.'};
+
+  document.getElementById('out-emoji').textContent=won?'🏆':'📉';
+  document.getElementById('out-title').textContent=won?'Arena Champion!':'Outpaced by the AI';
+  document.getElementById('out-subtitle').textContent=won?`Your arena earned $${Math.round(totalRev/1000)}K vs AI's $${Math.round(totalAiRev/1000)}K.`:`AI arena earned more. Revisit your pricing strategy.`;
+  document.getElementById('out-total-rev').textContent='$'+Math.round(totalRev/1000)+'K';
+  document.getElementById('out-avg-att').textContent=Math.round(history.reduce((s,h)=>s+h.att,0)/history.length).toLocaleString();
+  document.getElementById('out-sat').textContent=avgSat+'%';
+  document.getElementById('out-ai-rev').textContent='$'+Math.round(totalAiRev/1000)+'K';
+  document.getElementById('grade-letter').textContent=grade;
+  document.getElementById('grade-letter').style.color=grade==='A'?'var(--green)':grade==='B'?'var(--accent)':grade==='C'?'var(--blue)':'var(--red)';
+  document.getElementById('grade-desc').textContent=gradeDescs[grade];
+  document.getElementById('history-grid').innerHTML=history.map(h=>`
+    <div class="month-cell">
+      <div class="label">Month ${h.month}</div>
+      <div class="val accent">$${Math.round(h.rev/1000)}K</div>
+      <div class="val" style="font-size:10px;color:var(--muted)">${h.att.toLocaleString()} fans · ${h.sat}% sat</div>
+    </div>
+  `).join('');
+}
+</script>
+</body>
+</html>

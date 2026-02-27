@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tank Commander — BSC</title>
+<style>
+  :root{--bg:#0a0e1a;--surface:#111827;--card:#1a2035;--border:#1e293b;--accent:#f59e0b;--green:#10b981;--red:#ef4444;--blue:#3b82f6;--text:#e2e8f0;--muted:#64748b}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min-height:100vh}
+  .nav{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:12px}
+  .nav a{color:var(--muted);text-decoration:none;font-size:13px}.nav a:hover{color:var(--accent)}
+  .logo{color:var(--accent);font-weight:900;font-size:18px}
+  .container{max-width:900px;margin:0 auto;padding:32px 16px}
+  h1{font-size:32px;font-weight:900;margin-bottom:8px}
+  h2{font-size:16px;font-weight:700;margin-bottom:12px}
+  .subtitle{color:var(--muted);margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center}
+  .stat-val{font-size:24px;font-weight:900;margin-bottom:4px}
+  .stat-label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  .btn{background:var(--accent);color:#000;font-weight:900;border:none;border-radius:10px;padding:12px 24px;cursor:pointer;font-size:15px;transition:.2s}
+  .btn:hover{opacity:.9}.btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-outline{background:transparent;color:var(--text);border:1px solid var(--border)}.btn-outline:hover{border-color:var(--accent)}
+  .month-row{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;transition:.2s}
+  .month-row.current{border-color:var(--accent);background:#2a1f00}
+  .month-name{width:90px;font-weight:600;font-size:13px}
+  .month-controls{display:flex;gap:8px;margin-left:auto}
+  .mode-btn{padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:12px;font-weight:700;transition:.2s}
+  .mode-btn.compete.active{background:var(--green);border-color:var(--green);color:#000}
+  .mode-btn.tank.active{background:var(--red);border-color:var(--red);color:#fff}
+  .record{font-size:11px;color:var(--muted);width:40px}
+  .morale-mini{font-size:10px;width:60px;text-align:right}
+  .lottery-ball{width:48px;height:48px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;margin:4px;border:2px solid rgba(255,255,255,.2)}
+  .progress-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+  .progress-fill{height:100%;border-radius:3px;transition:width .6s}
+  .hidden{display:none}
+  .event-badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;margin:4px;background:var(--surface);border:1px solid var(--border)}
+  .green{color:var(--green)}.red{color:var(--red)}.accent{color:var(--accent)}.blue{color:var(--blue)}
+  .investigation-alert{background:#450a0a;border:2px solid var(--red);border-radius:12px;padding:16px;margin-bottom:16px}
+  .pick-slot{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;margin-bottom:8px}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="logo">BSC</a>
+  <span style="color:var(--border)">|</span>
+  <a href="/">← Back to Hub</a>
+</nav>
+
+<div class="container">
+
+<!-- INTRO -->
+<div id="screen-intro">
+  <div style="text-align:center;margin-bottom:32px">
+    <div style="font-size:64px;margin-bottom:16px">🎯</div>
+    <h1>TANK COMMANDER</h1>
+    <p class="subtitle">Rebuild through the draft. But the NBA makes it hard to tank — and your players have feelings.</p>
+  </div>
+
+  <div class="card">
+    <h2>How Tanking Works (Real NBA Rules)</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;color:#94a3b8">
+      <div>🎱 <strong style="color:var(--text)">Lottery odds aren't 100%</strong> — worst team only has 14% chance at #1</div>
+      <div>📉 <strong style="color:var(--text)">Too obvious?</strong> NBA investigates — you lose future picks</div>
+      <div>😤 <strong style="color:var(--text)">Players hate losing</strong> — morale drops affect trade value</div>
+      <div>⚖️ <strong style="color:var(--text)">Trade deadline decision</strong> — rent a vet to push or sell for picks?</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2024 Lottery Odds (NBA Reform)</h2>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px">
+      <div style="text-align:center;font-size:12px"><div style="font-weight:900;color:var(--red)">14%</div><div style="color:var(--muted)">#1 worst</div></div>
+      <div style="text-align:center;font-size:12px"><div style="font-weight:900;color:var(--accent)">13.4%</div><div style="color:var(--muted)">#2 worst</div></div>
+      <div style="text-align:center;font-size:12px"><div style="font-weight:900;color:var(--accent)">12.7%</div><div style="color:var(--muted)">#3 worst</div></div>
+      <div style="text-align:center;font-size:12px"><div style="font-weight:900;color:var(--blue)">12%</div><div style="color:var(--muted)">#4 worst</div></div>
+      <div style="text-align:center;font-size:12px"><div style="font-weight:900;color:var(--green)">8%</div><div style="color:var(--muted)">#7 worst</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--muted)">Notice: The difference between 14% and 8% is small. Extreme tanking isn't guaranteed to pay off.</div>
+  </div>
+
+  <div style="margin-bottom:24px">
+    <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:8px">Grade Level:</label>
+    <select id="track-sel" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px">
+      <option value="easy">5th–6th Grade (with hints)</option>
+      <option value="hard">7th–8th Grade (Hard Mode)</option>
+    </select>
+  </div>
+
+  <button class="btn" style="width:100%" onclick="startGame()">BEGIN SEASON →</button>
+</div>
+
+<!-- SEASON SCREEN -->
+<div id="screen-season" class="hidden">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <h1>🎯 Tank Season</h1>
+      <div style="color:var(--muted);font-size:13px">Manage each month. Each choice affects your lottery odds, morale, and NBA investigation risk.</div>
+    </div>
+    <div style="text-align:right">
+      <div id="lottery-pct" style="font-size:28px;font-weight:900;color:var(--accent)">14%</div>
+      <div style="color:var(--muted);font-size:12px">Current Lottery Odds</div>
+    </div>
+  </div>
+
+  <div id="hint-season" class="card" style="border-left:4px solid var(--blue);display:none">
+    <div style="color:var(--blue);font-weight:700;font-size:12px;margin-bottom:4px">💡 GUIDE</div>
+    <div style="font-size:13px;color:#94a3b8">Each month, choose whether to COMPETE (play stars, better chance of winning) or TANK (bench stars, better lottery odds). But don't tank too much or the NBA investigates!</div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-val" id="stat-record">0–0</div>
+      <div class="stat-label">Record</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val accent" id="stat-lottery">14%</div>
+      <div class="stat-label">Lottery Odds</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-morale" style="color:var(--green)">75%</div>
+      <div class="stat-label">Team Morale</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-invest" style="color:var(--green)">0</div>
+      <div class="stat-label">NBA Invest. Level</div>
+    </div>
+  </div>
+
+  <div id="investigation-alert" class="investigation-alert hidden">
+    ⚠️ <strong>NBA INVESTIGATION ACTIVE!</strong> You've been benching stars too obviously. Continue tanking aggressively and lose a future pick.
+  </div>
+
+  <div id="months-list"></div>
+
+  <div id="deadline-section" class="hidden card" style="border-color:var(--accent)">
+    <h2>🕐 TRADE DEADLINE — Make Your Call</h2>
+    <p style="color:#94a3b8;font-size:13px;margin-bottom:16px">You have a veteran expiring at $8M. Two choices:</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <button onclick="deadlineChoice('sell')" class="btn" style="background:var(--green);padding:16px">
+        <div>SELL — Trade Him</div>
+        <div style="font-size:12px;font-weight:400;margin-top:4px">Get a 2nd round pick. Lose production. More morale hit.</div>
+      </button>
+      <button onclick="deadlineChoice('keep')" class="btn" style="background:var(--blue);color:#fff;padding:16px">
+        <div>KEEP — Push for Lottery Spot</div>
+        <div style="font-size:12px;font-weight:400;margin-top:4px">Better chance at improved lottery seeding. No extra asset.</div>
+      </button>
+    </div>
+  </div>
+
+  <button class="btn" id="btn-simulate" onclick="simulateSeason()" style="width:100%;margin-top:8px">SIMULATE LOTTERY DRAW →</button>
+</div>
+
+<!-- LOTTERY SCREEN -->
+<div id="screen-lottery" class="hidden">
+  <div style="text-align:center;margin-bottom:24px">
+    <h1>🎱 LOTTERY NIGHT</h1>
+    <p class="subtitle">The balls are drawn. Your fate is decided.</p>
+  </div>
+
+  <div id="lottery-balls" style="text-align:center;margin-bottom:24px;padding:20px;background:var(--card);border-radius:12px;border:1px solid var(--border)"></div>
+
+  <div class="card" style="text-align:center">
+    <div style="color:var(--muted);font-size:13px;margin-bottom:8px">Your Draft Position</div>
+    <div id="pick-result" style="font-size:72px;font-weight:900;color:var(--accent)"></div>
+    <div id="pick-label" style="color:var(--muted);margin-bottom:16px"></div>
+    <div id="pick-player" style="font-size:16px;font-weight:700;color:var(--text)"></div>
+    <div id="pick-player-desc" style="color:var(--muted);font-size:13px;margin-top:4px"></div>
+  </div>
+
+  <div class="card" id="season-summary">
+    <h2>Season Summary</h2>
+    <div id="summary-content"></div>
+  </div>
+
+  <button class="btn" style="width:100%" onclick="location.reload()">PLAY AGAIN</button>
+</div>
+
+</div>
+
+<script>
+const MONTHS=['October','November','December','January','February (ASB)','March','April'];
+const PROSPECTS=[
+  {pick:1,name:'Zaccharie Risacher',pos:'SF',rating:92,desc:'Elite French wing. Franchise cornerstone.'},
+  {pick:2,name:'Alex Sarr',pos:'C',rating:90,desc:'Mobile big man. Defensive anchor + stretch.'},
+  {pick:3,name:'Reed Sheppard',pos:'PG',rating:88,desc:'Pure shooter. Instant floor spacer.'},
+  {pick:4,name:'Donovan Clingan',pos:'C',rating:86,desc:'Big man who blocks shots. Culture player.'},
+  {pick:5,name:'Rob Dillingham',pos:'PG',rating:84,desc:'Explosive playmaker. High upside.'},
+  {pick:6,name:'Stephon Castle',pos:'SG',rating:83,desc:'Defender + scorer. Can guard 1-3.'},
+  {pick:7,name:'Tidjane Salaun',pos:'SF',rating:81,desc:'Project wing. High ceiling, slow start.'},
+  {pick:8,name:'Nikola Topic',pos:'PG',rating:80,desc:'International playmaker. Missed Year 1.'},
+  {pick:9,name:'Cody Williams',pos:'SF',rating:79,desc:'Athletic wing. Needs development.'},
+  {pick:10,name:'Carlton Carrington',pos:'PG',rating:77,desc:'Steady backup. Won\'t be a star.'},
+];
+const LOTTERY_ODDS=[14,13.4,12.7,12,10.5,9,8,7,6,5,4,3,2,1,1];
+const BALL_COLORS=['#ef4444','#f59e0b','#10b981','#3b82f6','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899','#14b8a6'];
+
+let track='easy',wins=0,losses=0,morale=75,investigationLevel=0,monthDecisions=[],tankMonths=0,deadlineDone=false,currentMonth=0;
+
+function startGame(){
+  track=document.getElementById('track-sel').value;
+  document.getElementById('screen-intro').classList.add('hidden');
+  document.getElementById('screen-season').classList.remove('hidden');
+  if(track==='easy')document.getElementById('hint-season').style.display='block';
+  renderMonths();
+}
+
+function renderMonths(){
+  const list=document.getElementById('months-list');
+  list.innerHTML='';
+  MONTHS.forEach((m,i)=>{
+    const dec=monthDecisions[i];
+    const isCurrent=i===currentMonth;
+    const isPast=i<currentMonth;
+    const div=document.createElement('div');
+    div.className='month-row'+(isCurrent?' current':'');
+    div.style.opacity=isPast||isCurrent?'1':'0.5';
+    div.innerHTML=`
+      <div class="month-name">${m}</div>
+      ${isCurrent?`
+        <button class="mode-btn compete ${dec==='compete'?'active':''}" onclick="setDecision(${i},'compete')">COMPETE</button>
+        <button class="mode-btn tank ${dec==='tank'?'active':''}" onclick="setDecision(${i},'tank')">TANK</button>
+      `:`<div style="color:${dec==='compete'?'var(--green)':dec==='tank'?'var(--red)':'var(--muted)'};font-size:12px;font-weight:700">${dec||'—'}</div>`}
+      <div class="record" id="record-${i}">
+        ${isPast?`${monthDecisions[i]==='compete'?3:1}–${monthDecisions[i]==='compete'?2:4}`:isCurrent?'':'–'}
+      </div>
+      <div class="morale-mini" style="color:${morale>60?'var(--green)':morale>30?'var(--accent)':'var(--red)'}">
+        ${isPast?`😊`:isCurrent?`${morale}%`:''}
+      </div>
+    `;
+    list.appendChild(div);
+  });
+  updateStats();
+}
+
+function setDecision(month,dec){
+  monthDecisions[month]=dec;
+  if(dec==='tank')tankMonths++;
+
+  // Apply consequences
+  if(dec==='compete'){wins+=Math.floor(Math.random()*3)+2;losses+=Math.floor(Math.random()*2)+1;morale=Math.min(100,morale+5);}
+  else{wins+=Math.floor(Math.random()*1);losses+=Math.floor(Math.random()*3)+3;morale=Math.max(0,morale-12);investigationLevel+=15;}
+
+  // Check investigation
+  if(investigationLevel>=45){
+    document.getElementById('investigation-alert').classList.remove('hidden');
+  }
+
+  currentMonth++;
+  if(currentMonth===4&&!deadlineDone){ // Feb = trade deadline
+    document.getElementById('deadline-section').classList.remove('hidden');
+  } else if(currentMonth>=MONTHS.length){
+    document.getElementById('btn-simulate').style.display='block';
+  }
+
+  updateStats();
+  renderMonths();
+}
+
+function deadlineChoice(choice){
+  deadlineDone=true;
+  if(choice==='sell'){morale=Math.max(0,morale-10);wins-=1;losses+=1;}
+  else{morale=Math.max(0,morale+5);}
+  document.getElementById('deadline-section').classList.add('hidden');
+}
+
+function updateStats(){
+  const lossRank=Math.round(losses/Math.max(wins+losses,1)*14)+1;
+  const cappedRank=Math.min(15,Math.max(1,lossRank));
+  const odds=LOTTERY_ODDS[cappedRank-1]||1;
+  document.getElementById('stat-record').textContent=wins+'–'+losses;
+  document.getElementById('stat-lottery').textContent=odds.toFixed(1)+'%';
+  document.getElementById('stat-morale').textContent=morale+'%';
+  document.getElementById('stat-morale').style.color=morale>60?'var(--green)':morale>30?'var(--accent)':'var(--red)';
+  document.getElementById('stat-invest').textContent=investigationLevel+'%';
+  document.getElementById('stat-invest').style.color=investigationLevel>60?'var(--red)':investigationLevel>30?'var(--accent)':'var(--green)';
+  document.getElementById('lottery-pct').textContent=odds.toFixed(1)+'%';
+  document.getElementById('stat-lottery').textContent=odds.toFixed(1)+'%';
+}
+
+function simulateSeason(){
+  // Determine lottery position based on losses
+  const lossRank=Math.round(losses/(wins+losses)*14)+1;
+  let myPos=Math.min(14,Math.max(1,lossRank));
+
+  // Investigation penalty
+  if(investigationLevel>=70)myPos=Math.max(myPos+2,1);
+
+  // Lottery randomness — can jump up or down
+  const roll=Math.random()*100;
+  if(roll<LOTTERY_ODDS[myPos-1])myPos=Math.max(1,myPos-2);
+  else if(roll>85)myPos=Math.min(14,myPos+2);
+
+  document.getElementById('screen-season').classList.add('hidden');
+  document.getElementById('screen-lottery').classList.remove('hidden');
+
+  // Animate balls
+  const balls=document.getElementById('lottery-balls');
+  balls.innerHTML='';
+  for(let i=0;i<14;i++){
+    const ball=document.createElement('div');
+    ball.className='lottery-ball';
+    ball.style.background=BALL_COLORS[i%BALL_COLORS.length];
+    ball.textContent=i+1;
+    ball.style.opacity='0';
+    balls.appendChild(ball);
+    setTimeout(()=>{ball.style.opacity='1';ball.style.transition='opacity .3s';},i*150);
+  }
+
+  setTimeout(()=>{
+    const prospect=PROSPECTS.find(p=>p.pick===myPos)||PROSPECTS[PROSPECTS.length-1];
+    document.getElementById('pick-result').textContent='#'+myPos;
+    document.getElementById('pick-label').textContent=myPos<=4?'🎉 LOTTERY PICK!':myPos<=10?'Top 10 pick':'Late lottery';
+    document.getElementById('pick-player').textContent=prospect.name+' ('+prospect.pos+')';
+    document.getElementById('pick-player-desc').textContent=prospect.desc;
+    document.getElementById('summary-content').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+        <div><span style="color:var(--muted)">Final Record</span><br><strong>${wins}–${losses}</strong></div>
+        <div><span style="color:var(--muted)">Draft Pick</span><br><strong style="color:var(--accent)">#${myPos} Overall</strong></div>
+        <div><span style="color:var(--muted)">Final Morale</span><br><strong style="color:${morale>50?'var(--green)':'var(--red)'}">${morale}%</strong></div>
+        <div><span style="color:var(--muted)">Tank Months</span><br><strong>${tankMonths} of 7</strong></div>
+      </div>
+      ${investigationLevel>=70?'<div style="color:var(--red);margin-top:12px;font-size:13px">⚠️ NBA investigation cost you a future pick.</div>':''}
+    `;
+  },2500);
+}
+</script>
+</body>
+</html>

@@ -10,16 +10,18 @@ const MAIN_SIMS = [
     tags: ['Trade Mechanics', 'Salary Matching', 'AI Negotiation'],
     difficulty: 'High Stakes',
     color: '#f59e0b',
+    time: '~15 min',
   },
   {
     href: '/lebron-files',
     emoji: '👑',
     title: 'The LeBron Files',
     subtitle: 'Build a Superstar\'s Career',
-    description: '4 career decision points. Every choice cascades into the next. Team selection → Contract structure → Endorsements → Business empire.',
+    description: '5 career decision points. Every choice cascades into the next. Team selection → Contract → Endorsements → Business empire → The Bronny Decision.',
     tags: ['Contracts', 'Endorsements', 'Investments'],
     difficulty: 'Multi-Stage',
     color: '#8b5cf6',
+    time: '~20 min',
   },
   {
     href: '/dumpster-fire',
@@ -30,16 +32,29 @@ const MAIN_SIMS = [
     tags: ['Cap Escape', 'Luxury Tax', 'Rebuild Strategy'],
     difficulty: '3-Year Arc',
     color: '#ef4444',
+    time: '~15 min',
   },
   {
     href: '/ground-zero',
     emoji: '🏟️',
     title: 'Ground Zero',
     subtitle: 'Expansion Franchise',
-    description: 'Brand new team. Expansion draft + free agency. Build your roster, pick your city, simulate Year 1. AI rival team competes against you.',
+    description: 'Brand new team. Expansion draft + free agency. Build your roster, name your franchise, simulate Year 1. AI rival team competes against you.',
     tags: ['Expansion Draft', 'Free Agency', 'Roster Building'],
     difficulty: 'AI vs. You',
     color: '#10b981',
+    time: '~15 min',
+  },
+  {
+    href: '/rookie-deal',
+    emoji: '🎯',
+    title: 'The Rookie Deal',
+    subtitle: 'Agent Negotiation Sim',
+    description: 'You\'re the agent for a top-5 draft pick. Navigate rookie scale contracts, shoe deals, and the extension-or-free-agency decision that defines careers.',
+    tags: ['Rookie Scale', 'Shoe Deals', 'Extension vs. FA'],
+    difficulty: 'Agent Mode',
+    color: '#06b6d4',
+    time: '~12 min',
   },
 ];
 
@@ -91,7 +106,7 @@ export default function Home() {
 
       {/* Concept tags */}
       <div className="flex flex-wrap gap-2 justify-center mb-12">
-        {['Trade Negotiations', 'Endorsement Economics', 'Luxury Tax', 'Expansion Drafts', 'Career Management', 'Arena Revenue', 'Tanking Strategy'].map(tag => (
+        {['Trade Negotiations', 'Endorsement Economics', 'Luxury Tax', 'Expansion Drafts', 'Career Management', 'Rookie Scale', 'Arena Revenue', 'Tanking Strategy', 'Agent Negotiations'].map(tag => (
           <span key={tag} className="px-3 py-1 bg-[#1a2035] border border-[#1e293b] rounded-full text-xs text-[#64748b]">{tag}</span>
         ))}
       </div>
@@ -124,9 +139,14 @@ export default function Home() {
                   <span key={tag} className="text-xs px-2 py-0.5 bg-[#0a0e1a] border border-[#1e293b] rounded-full text-[#64748b]">{tag}</span>
                 ))}
               </div>
-              <div className="mt-4 flex items-center gap-2 text-sm" style={{ color: sim.color }}>
-                <span>Launch Sim</span>
-                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2" style={{ color: sim.color }}>
+                  <span>Launch Sim</span>
+                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+                {'time' in sim && (
+                  <span className="text-xs text-[#64748b]">⏱ {sim.time}</span>
+                )}
               </div>
             </Link>
           ))}
@@ -175,6 +195,9 @@ export default function Home() {
             { concept: 'Tanking & Lottery Odds', sim: 'Tank Commander' },
             { concept: 'Investment & Equity', sim: 'LeBron Files' },
             { concept: 'Player Brand Building', sim: 'Endorsement Empire' },
+            { concept: 'Rookie Scale Contracts', sim: 'Rookie Deal' },
+            { concept: 'Shoe Deal Negotiation', sim: 'Rookie Deal' },
+            { concept: 'Extension vs. Free Agency', sim: 'Rookie Deal' },
           ].map(({ concept, sim }) => (
             <div key={concept} className="p-2 bg-[#0a0e1a] rounded-lg">
               <div className="text-[#e2e8f0] font-medium mb-0.5">{concept}</div>

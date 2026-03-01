@@ -345,6 +345,50 @@ export const INVESTMENT_OPTIONS: InvestmentOption[] = [
   },
 ];
 
+export interface BronnyDecision {
+  id: string;
+  label: string;
+  description: string;
+  ringsChange: number;
+  earningsChange: number; // millions
+  legacyChange: number;
+  pros: string[];
+  cons: string[];
+}
+
+export const BRONNY_DECISIONS: BronnyDecision[] = [
+  {
+    id: 'take-vet-min',
+    label: 'Accept Vet Minimum — Play with Bronny',
+    description: 'Take a veteran minimum ($2.7M) to stay with the Lakers and play alongside your son. Historic moment. Legacy over money.',
+    ringsChange: 0,
+    earningsChange: -45,
+    legacyChange: 15,
+    pros: ['First father-son duo in NBA history', 'Iconic legacy moment', 'Fan love through the roof'],
+    cons: ['$45M+ left on the table', 'Lower roster impact', 'Short championship window'],
+  },
+  {
+    id: 'demand-player-option',
+    label: 'Demand Player Option — Keep Leverage',
+    description: 'Sign a 1+1 with a player option. Get paid (~$47M), stay flexible, play with Bronny for 1 guaranteed year. Pure business.',
+    ringsChange: 0,
+    earningsChange: 47,
+    legacyChange: 5,
+    pros: ['Full salary retained', 'Annual leverage', 'Championship flexibility'],
+    cons: ['Constant trade rumors', 'Less narrative impact', 'Tension with front office'],
+  },
+  {
+    id: 'retire',
+    label: 'Retire on Top',
+    description: 'Walk away from the game after 21 seasons. Leave as the all-time scoring leader. Legacy secured. Business empire awaits.',
+    ringsChange: 0,
+    earningsChange: -30,
+    legacyChange: 20,
+    pros: ['Controls the narrative', 'Goes out on own terms', 'Focus on SpringHill, NFL bid'],
+    cons: ['Never plays with Bronny officially', 'Leaves money behind', 'Fans want more'],
+  },
+];
+
 export const LEBRON_REAL_TIMELINE = [
   { year: 2010, decision: 'Joined Miami Heat on 1+1 player options', rings: 0, earnings: 20.1, legacyNote: 'The Decision — vilified initially, redeemed by championships' },
   { year: 2012, decision: 'Won first NBA Championship with Heat', rings: 1, earnings: 22.0, legacyNote: 'Silenced doubters. First of back-to-back with Wade and Bosh' },

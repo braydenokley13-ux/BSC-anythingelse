@@ -94,7 +94,7 @@ export function projectWinPct(players: Array<{ rating: number; salary: number }>
 
 // Calculate trade value (0-10 scale)
 export function tradeValue(rating: number, salary: number, yearsLeft: number, age: number): number {
-  const efficiency = rating / salary; // higher = better deal
+  const efficiency = rating / Math.max(salary, 1); // guard against division by zero
   const agePenalty = Math.max(0, (age - 28) * 0.3);
   const raw = efficiency * 2.5 - agePenalty + (yearsLeft * 0.3);
   return Math.max(0, Math.min(10, Math.round(raw * 10) / 10));

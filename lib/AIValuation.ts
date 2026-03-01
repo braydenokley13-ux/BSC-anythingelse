@@ -17,6 +17,7 @@ export interface TradeProposal {
   picksStudentGives: Array<{ year: number; value: number }>;
   picksStudentReceives: Array<{ year: number; value: number }>;
   aiTeamNeeds: string[];
+  aiTeamName?: string; // city name for flavored dialogue
 }
 
 function totalValue(players: Array<{ rating: number; salary: number; yearsLeft: number }>): number {
@@ -27,7 +28,11 @@ function totalValue(players: Array<{ rating: number; salary: number; yearsLeft: 
 }
 
 function totalPickValue(picks: Array<{ year: number; value: number }>): number {
-  return picks.reduce((sum, p) => sum + p.value * 4, 0); // each pick point worth ~4 value units
+  return picks.reduce((sum, p) => sum + p.value * 4, 0);
+}
+
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 export function evaluateTrade(proposal: TradeProposal): AIEvaluation {
@@ -38,53 +43,84 @@ export function evaluateTrade(proposal: TradeProposal): AIEvaluation {
   const aiValueGained = studentGivingValue;
   const aiValueLost = studentReceivingValue;
   const ratio = aiValueGained / Math.max(aiValueLost, 1);
+  const gmName = proposal.aiTeamName ? `${proposal.aiTeamName} GM` : 'Our front office';
 
-  // Check needs fit
-  const needsFit = proposal.studentReceives.some(p =>
+  // Check needs fit — does what student gives help the AI team's needs?
+  const needsFit = proposal.studentGives.some(p =>
     proposal.aiTeamNeeds.some(need => p.name.toLowerCase().includes(need.toLowerCase()))
   );
 
+  const needLabel = proposal.aiTeamNeeds[0] || 'better pieces';
+
   if (ratio >= 1.1 && needsFit) {
+    const acceptReasons = [
+      `This works for us. We're getting fair value and it addresses our ${needLabel} need. Deal.`,
+      `${gmName} approves. The value is there and you're giving us exactly what we need.`,
+      `We've run the numbers — this trade helps our rebuild. You've got a deal.`,
+      `This is fair. We get our ${needLabel} and the salaries line up. Let's get this done.`,
+      `Good negotiating. You found the price and met it. We accept.`,
+      `Our analytics team likes this one. Fair value, good fit. Accepted.`,
+      `You read us correctly. ${needLabel} is exactly what we needed. We're in.`,
+      `Smart offer. You gave us what we asked for and the math works. Shaking hands.`,
+    ];
     return {
       decision: 'Accept',
-      reason: `This works for us. We\'re getting fair value and it addresses our ${proposal.aiTeamNeeds[0]} need.`,
+      reason: pickRandom(acceptReasons),
       confidenceScore: Math.min(95, Math.round(ratio * 60)),
     };
   }
 
   if (ratio >= 0.85 && ratio < 1.1) {
     if (!needsFit) {
+      const counterReasons = [
+        `The value is close but you're not giving us our ${needLabel}. Restructure this.`,
+        `Interesting offer. The numbers are nearly there but we need ${needLabel} in this deal.`,
+        `${gmName} says: close, but not quite. We need ${needLabel} to pull the trigger.`,
+        `We can almost make this work. Send us a ${needLabel} and we revisit.`,
+        `You're in the ballpark on value but missing what we actually need: ${needLabel}.`,
+      ];
       return {
         decision: 'Counter',
-        reason: `The value is close but doesn\'t address our needs. We need ${proposal.aiTeamNeeds[0] || 'different pieces'}.`,
+        reason: pickRandom(counterReasons),
         counterOffer: {
           requestAdditional: proposal.aiTeamNeeds,
-          message: `Add a ${proposal.aiTeamNeeds[0] || 'better fit'} and we\'ll talk.`,
+          message: `Swap out a piece and add ${needLabel} and we'll sign off on it.`,
         },
         confidenceScore: 45,
       };
     }
+    const acceptNearReasons = [
+      `Fair trade. Close to even value and it helps our roster. We accept.`,
+      `We'll take it. Not our best deal, but it moves us in the right direction.`,
+      `${gmName} signs off. The fit is right and value is close enough.`,
+      `This works. It's not a win-win but it's fair. Done.`,
+    ];
     return {
       decision: 'Accept',
-      reason: 'Fair trade. Close to even value and helps our roster.',
+      reason: pickRandom(acceptNearReasons),
       confidenceScore: 60,
     };
   }
 
   if (ratio < 0.85) {
-    const deficit = ((aiValueLost - aiValueGained) / aiValueLost * 100).toFixed(0);
-    const reasons = [
-      `You\'re getting significantly more value than you\'re giving. We need more.`,
-      `We\'d be losing ${deficit}% of the value in this deal. Not happening.`,
-      `The return doesn\'t justify trading a player at this point in our rebuild.`,
-      `Our front office isn\'t interested at this price. Add picks or a better player.`,
+    const deficit = ((aiValueLost - aiValueGained) / Math.max(aiValueLost, 1) * 100).toFixed(0);
+    const rejectReasons = [
+      `You're getting significantly more value than you're giving. We need more.`,
+      `${gmName} laughed at this one. We'd be losing ${deficit}% of the value. Not happening.`,
+      `This doesn't come close. Add picks or a better player and come back.`,
+      `Our front office isn't interested at this price. You're low-balling us.`,
+      `We didn't get into this business to lose trades. Come back with a real offer.`,
+      `The return doesn't justify what we'd be giving up. Add first-round picks.`,
+      `This is the opening offer? We expected better. ${deficit}% value deficit is too much.`,
+      `Not a chance. Add picks, upgrade the player, or both — then we'll talk.`,
+      `${gmName} says no. You kept the best pieces and sent us the scraps.`,
     ];
     return {
       decision: 'Reject',
-      reason: reasons[Math.floor(Math.random() * reasons.length)],
+      reason: pickRandom(rejectReasons),
       counterOffer: {
-        requestAdditional: ['draft pick', ...proposal.aiTeamNeeds],
-        message: `If you add a first-round pick and ${proposal.aiTeamNeeds[0] || 'better salary filler'}, we\'d revisit.`,
+        requestAdditional: ['first-round pick', ...proposal.aiTeamNeeds],
+        message: `Add a first-round pick and ${needLabel}, then we'd revisit this conversation.`,
       },
       confidenceScore: 20,
     };
@@ -92,10 +128,10 @@ export function evaluateTrade(proposal: TradeProposal): AIEvaluation {
 
   return {
     decision: 'Counter',
-    reason: 'Interesting offer. We want to adjust the pieces slightly.',
+    reason: `Interesting offer. ${gmName} wants to adjust the pieces slightly to make this work for both sides.`,
     counterOffer: {
       requestAdditional: proposal.aiTeamNeeds,
-      message: 'Let\'s restructure this to work for both sides.',
+      message: `Let's restructure this. We need ${needLabel} to make it work on our end.`,
     },
     confidenceScore: 50,
   };

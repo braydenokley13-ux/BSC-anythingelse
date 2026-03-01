@@ -9,13 +9,18 @@ interface CapSheetPanelProps {
   picks: DraftPick[];
   selectedOutgoing: string[];
   selectedIncoming: string[];
-  onTogglePlayer: (id: string, direction: 'out' | 'in') => void;
+  selectedOutgoingPicks: string[];
+  selectedIncomingPicks: string[];
+  onTogglePlayer: (id: string) => void;
+  onTogglePick: (id: string) => void;
   isStudentTeam: boolean;
   showHints?: boolean;
 }
 
 export default function CapSheetPanel({
-  teamName, players, picks, selectedOutgoing, selectedIncoming, onTogglePlayer, isStudentTeam, showHints
+  teamName, players, picks, selectedOutgoing, selectedIncoming,
+  selectedOutgoingPicks, selectedIncomingPicks,
+  onTogglePlayer, onTogglePick, isStudentTeam, showHints
 }: CapSheetPanelProps) {
   const outgoingSalary = players
     .filter(p => selectedOutgoing.includes(p.id))
@@ -49,7 +54,7 @@ export default function CapSheetPanel({
 
       {showHints && isStudentTeam && (
         <div className="px-3 py-2 bg-[#1a2035] border-b border-[#1e293b] text-xs text-[#94a3b8]">
-          💡 Click players to add them to your trade offer. Red border = too expensive to include. Green = cap-legal match.
+          💡 Click players or picks to add them to your trade offer. Red border = too expensive to include.
         </div>
       )}
 
@@ -57,15 +62,14 @@ export default function CapSheetPanel({
         {players.map(player => {
           const isOut = selectedOutgoing.includes(player.id);
           const isIn = selectedIncoming.includes(player.id);
-          const isHighlighted = isOut || isIn;
-          const canToggleOut = isStudentTeam && !player.isUntouchable;
+          const canToggle = !player.isUntouchable;
 
           return (
             <div
               key={player.id}
-              onClick={() => canToggleOut && onTogglePlayer(player.id, isStudentTeam ? 'out' : 'in')}
+              onClick={() => canToggle && onTogglePlayer(player.id)}
               className={`flex items-center justify-between p-2 rounded-lg border transition-all ${
-                canToggleOut ? 'cursor-pointer' : 'cursor-default'
+                canToggle ? 'cursor-pointer' : 'cursor-default'
               } ${
                 isOut ? 'bg-red-900/20 border-red-600' :
                 isIn ? 'bg-green-900/20 border-green-600' :
@@ -90,20 +94,36 @@ export default function CapSheetPanel({
           );
         })}
 
-        {picks.map(pick => (
-          <div key={pick.id} className="flex items-center justify-between p-2 rounded-lg border border-[#1e293b] bg-[#111827]">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-[#8b5cf6]">PICK</span>
-              <div className="text-sm text-[#e2e8f0]">{pick.year} 1st Rd</div>
-              {pick.protected && <span className="text-xs text-[#64748b]">({pick.protected})</span>}
+        {picks.map(pick => {
+          const isPickOut = selectedOutgoingPicks.includes(pick.id);
+          const isPickIn = selectedIncomingPicks.includes(pick.id);
+          return (
+            <div
+              key={pick.id}
+              onClick={() => onTogglePick(pick.id)}
+              className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer ${
+                isPickOut ? 'bg-red-900/20 border-red-600' :
+                isPickIn ? 'bg-green-900/20 border-green-600' :
+                'bg-[#111827] border-[#1e293b] hover:border-[#8b5cf6]'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-[#8b5cf6]">PICK</span>
+                <div className="text-sm text-[#e2e8f0]">{pick.year} 1st Rd · {pick.team}</div>
+                {pick.protected && <span className="text-xs text-[#64748b]">({pick.protected})</span>}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-0.5">
+                  {Array.from({ length: pick.estimatedValue }).map((_, i) => (
+                    <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#8b5cf6]" />
+                  ))}
+                </div>
+                {isPickOut && <span className="text-xs text-red-400 font-bold">OUT →</span>}
+                {isPickIn && <span className="text-xs text-green-400 font-bold">← IN</span>}
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: pick.estimatedValue }).map((_, i) => (
-                <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#8b5cf6]" />
-              ))}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {isStudentTeam && selectedOutgoing.length > 0 && (

@@ -40,9 +40,12 @@ export default function GroundZeroPage() {
     totalSalary: 0, morale: 60, winPct: 0.3, fanBase: 40, revenue: 0,
   });
   const [aiRivalPicks, setAiRivalPicks] = useState<string[]>([]);
+  const [lastAiPick, setLastAiPick] = useState<ExpansionPlayer | null>(null);
   const [seasonEvents, setSeasonEvents] = useState<string[]>([]);
   const [monthlyVariance, setMonthlyVariance] = useState<number[]>([]);
   const [finalScore, setFinalScore] = useState<{ wins: number; capFlexibility: number; fanGrowth: number; aiWins: number } | null>(null);
+  const [showWinFormula, setShowWinFormula] = useState(false);
+  const [draftSubStep, setDraftSubStep] = useState(0);
 
   const isAdvanced = track === '7-8';
   const availablePlayers = EXPANSION_PLAYER_POOL.filter(p => !p.isProtected && !aiRivalPicks.includes(p.id));
@@ -73,6 +76,7 @@ export default function GroundZeroPage() {
       totalSalary: s.totalSalary + player.salary * 0.2,
     }));
     setAiRivalPicks(newAiPicks);
+    setLastAiPick(aiChoice || null);
   }
 
   function signFA(player: typeof FREE_AGENT_POOL[0]) {
@@ -305,6 +309,65 @@ export default function GroundZeroPage() {
 
   // EXPANSION DRAFT
   if (phase === 'expansion-draft') {
+    // Sub-step 0: draft strategy overview
+    if (draftSubStep === 0) {
+      const topAvailable = [...availablePlayers].sort((a, b) => b.rating - a.rating).slice(0, 6);
+      return (
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <div className="mb-6">
+            <div className="text-xs text-[#64748b] uppercase tracking-widest mb-1">STEP 3 · STRATEGY PREVIEW</div>
+            <h1 className="text-2xl font-black text-white">Scouting the Expansion Pool</h1>
+            <p className="text-[#94a3b8] text-sm">Before you pick, know who&apos;s available. The AI rival city will also be choosing simultaneously.</p>
+          </div>
+          {!isAdvanced && (
+            <HintBox>Strategy tip: Draft 1–2 Stars first, then fill with Starters. Rotation guys come later. Remember — winning more means LOWER lottery odds for next year.</HintBox>
+          )}
+          <div className="mb-6 p-4 bg-[#111827] rounded-xl border border-[#1e293b]">
+            <div className="text-xs text-[#64748b] uppercase tracking-widest mb-3">🏆 Top Available Players</div>
+            <div className="space-y-2">
+              {topAvailable.map((p, i) => (
+                <div key={p.id} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#64748b] w-4">{i + 1}</span>
+                    <span className="font-bold text-white">{p.name}</span>
+                    <span className="text-[#64748b]">{p.position} · {p.team}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ background: archetypeColor[p.archetype] + '22', color: archetypeColor[p.archetype] }}>{p.archetype}</span>
+                    <span className="font-black" style={{ color: ratingColor(p.rating) }}>{p.rating}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Lottery explainer */}
+          <div className="mb-6 p-4 bg-[#0a1628] rounded-xl border border-[#3b82f6]/30">
+            <div className="text-xs font-bold text-[#3b82f6] uppercase tracking-widest mb-3">🎰 How the Lottery Works</div>
+            <div className="text-xs text-[#94a3b8] mb-3">The worst records get the best lottery odds for next year&apos;s #1 draft pick. Sometimes losing now = winning later.</div>
+            <div className="grid grid-cols-4 gap-2 text-[10px]">
+              {[
+                { wins: '≤20W', odds: '14%', slot: '#1–2 pick' },
+                { wins: '≤25W', odds: '12%', slot: '#3–5 pick' },
+                { wins: '≤30W', odds: '8%', slot: '#5–7 pick' },
+                { wins: '>30W', odds: '5%', slot: '#7–10 pick' },
+              ].map(row => (
+                <div key={row.wins} className="p-2 bg-[#111827] rounded-lg text-center">
+                  <div className="text-[#3b82f6] font-bold">{row.wins}</div>
+                  <div className="text-[#10b981]">{row.odds}</div>
+                  <div className="text-[#64748b]">{row.slot}</div>
+                </div>
+              ))}
+            </div>
+            {!isAdvanced && <div className="mt-3 text-[10px] text-[#64748b]">If you tank this season (lose a lot), you get better odds at the next star player. But is one season of losing worth it?</div>}
+          </div>
+          <button onClick={() => setDraftSubStep(1)} className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl text-lg hover:bg-[#fbbf24] transition-colors">
+            START EXPANSION DRAFT →
+          </button>
+        </div>
+      );
+    }
+
+    // Sub-step 1: actual draft
     return (
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-4">
@@ -318,6 +381,21 @@ export default function GroundZeroPage() {
             <div className="text-xs text-[#64748b]">Players picked</div>
           </div>
         </div>
+
+        {/* AI rival reveal banner */}
+        {lastAiPick && (
+          <div className="mb-4 p-3 bg-[#1a0505] border border-red-800 rounded-xl text-xs">
+            <span className="text-red-400 font-bold">🤖 Rival city just picked: </span>
+            <span className="text-white font-bold">{lastAiPick.name}</span>
+            <span className="text-[#64748b]"> (Rated {lastAiPick.rating} · {lastAiPick.position})</span>
+            {aiRivalPicks.length > 0 && (() => {
+              const aiAvg = aiRivalPicks.map(id => EXPANSION_PLAYER_POOL.find(p => p.id === id)?.rating || 0);
+              const yourAvg = state.draftPicks.length > 0 ? state.draftPicks.reduce((s, p) => s + p.rating, 0) / state.draftPicks.length : 0;
+              const rivalAvg = aiAvg.reduce((s, r) => s + r, 0) / aiAvg.length;
+              return <span className="ml-2 text-[#64748b]">Their avg: <span style={{ color: rivalAvg > yourAvg ? '#ef4444' : '#10b981' }}>{rivalAvg.toFixed(0)}</span> vs yours: <span style={{ color: yourAvg >= rivalAvg ? '#10b981' : '#ef4444' }}>{yourAvg > 0 ? yourAvg.toFixed(0) : '—'}</span></span>;
+            })()}
+          </div>
+        )}
 
         {!isAdvanced && (
           <HintBox>
@@ -426,8 +504,14 @@ export default function GroundZeroPage() {
         </div>
 
         {missingPositions.length > 0 && (
-          <div className="mb-4 p-3 bg-yellow-900/20 border border-yellow-700 rounded-xl text-xs text-yellow-400">
-            ⚠️ Missing positions: {missingPositions.join(', ')} — gaps in your lineup hurt win %.
+          <div className="mb-4 p-3 bg-yellow-900/20 border border-yellow-700 rounded-xl text-xs space-y-1">
+            <div className="text-yellow-400 font-bold">⚠️ Missing positions: {missingPositions.join(', ')}</div>
+            {missingPositions.includes('C') && (
+              <div className="text-[#94a3b8]">No Center: <span className="text-[#ef4444]">–5% win rate</span> = <span className="text-[#ef4444]">~4 fewer wins</span> this season</div>
+            )}
+            {missingPositions.filter(p => p !== 'C').map(pos => (
+              <div key={pos} className="text-[#94a3b8]">No {pos}: lineup gaps hurt defensive rotations and scoring efficiency</div>
+            ))}
           </div>
         )}
 
@@ -478,10 +562,35 @@ export default function GroundZeroPage() {
                   key={pos}
                   className={`text-xs px-2 py-0.5 rounded-full font-bold border ${positionCounts[pos] ? 'border-[#10b981] text-[#10b981] bg-green-900/20' : 'border-[#ef4444] text-[#ef4444] bg-red-900/10'}`}
                 >
-                  {pos}: {positionCounts[pos] || 0}
+                  {pos} {positionCounts[pos] ? '✓' : '✗'}
                 </span>
               ))}
             </div>
+
+            {/* Win% formula tooltip */}
+            <button onClick={() => setShowWinFormula(f => !f)} className="text-xs text-[#64748b] hover:text-[#f59e0b] underline mb-2 transition-colors">
+              {showWinFormula ? '▲ Hide win% formula' : '▼ How is win% calculated?'}
+            </button>
+            {showWinFormula && (
+              <div className="mb-3 p-3 bg-[#111827] rounded-lg text-xs space-y-1.5">
+                <div className="text-[#f59e0b] font-bold">Win% Formula:</div>
+                <div className="font-mono text-[#e2e8f0]">Win% = ((AvgRating – 60) ÷ 40) × 0.7 – PosPenalty</div>
+                {!isAdvanced && (
+                  <div className="space-y-1 text-[#94a3b8] mt-1">
+                    <div>League average rating is ~72. Rating 60 = 0.1 win%, Rating 100 = 0.7 win%</div>
+                    <div className="grid grid-cols-4 gap-1 mt-2 text-[10px]">
+                      {[{ r: 65, w: '~30W' }, { r: 70, w: '~40W' }, { r: 75, w: '~50W' }, { r: 80, w: '~60W' }].map(({ r, w }) => (
+                        <div key={r} className="bg-[#0a0e1a] rounded p-1 text-center">
+                          <div className="text-white font-bold">{r} Rtg</div>
+                          <div className="text-[#10b981]">{w}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-[#ef4444]">No Center penalty: –5% win% = ~4 fewer wins</div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="space-y-1 max-h-64 overflow-y-auto mb-4">
               {state.draftPicks.map(p => (

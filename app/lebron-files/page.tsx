@@ -9,7 +9,7 @@ import {
 import { formatMoney } from '@/lib/CapMath';
 import { HintBox } from '@/components/shared/TrackWrapper';
 
-type Phase = 'intro' | 'decision-2010' | 'decision-extension' | 'decision-2018' | 'investments' | 'bronny-2023' | 'outcome';
+type Phase = 'intro' | 'decision-2010' | 'decision-extension' | 'decision-2018' | 'investments' | 'scandal-event' | 'bronny-2023' | 'outcome';
 
 interface CareerState {
   chosenTeam2010: TeamOption | null;
@@ -50,13 +50,17 @@ export default function LeBronFilesPage() {
   const [revealedStep, setRevealedStep] = useState(false);
   const [consequence, setConsequence] = useState<{ title: string; text: string; stats: { label: string; value: string; color: string }[] } | null>(null);
   const [pendingPhase, setPendingPhase] = useState<Phase | null>(null);
+  const [decisionSubStep, setDecisionSubStep] = useState(0);
+  const [pendingScandal, setPendingScandal] = useState<{ brand: string; risk: number } | null>(null);
+  const [scandalBrand, setScandalBrand] = useState<string | null>(null);
+  const [legacyBreakdown, setLegacyBreakdown] = useState<{ source: string; amount: number }[]>([]);
 
   const isAdvanced = track === '7-8';
 
   const TEAM_CONSEQUENCES: Record<string, { title: string; text: string; stats: { label: string; value: string; color: string }[] }> = {
     heat: {
       title: 'Year 1 — Miami: The Villain Era Begins',
-      text: '"The Decision" caused a national meltdown. Jerseys burned in Cleveland. But in Miami, 20,000 fans packed an arena just for the introductory press conference. LeBron, Wade, and Bosh formed the most hyped team since the '96 Bulls. Year 1 ended in the Finals — a loss to Dallas that still haunts the legacy.',
+      text: '"The Decision" caused a national meltdown. Jerseys burned in Cleveland. But in Miami, 20,000 fans packed an arena just for the introductory press conference. LeBron, Wade, and Bosh formed the most hyped team since the \'96 Bulls. Year 1 ended in the Finals — a loss to Dallas that still haunts the legacy.',
       stats: [{ label: 'Season Result', value: 'NBA Finals — Lost to Dallas', color: '#ef4444' }, { label: 'Narrative', value: 'National villain → rings chaser', color: '#f59e0b' }, { label: 'Legacy Impact', value: 'Controversial but winning', color: '#8b5cf6' }],
     },
     cavaliers: {
@@ -105,6 +109,7 @@ export default function LeBronFilesPage() {
     }));
     // Show consequence card before advancing
     const conseq = TEAM_CONSEQUENCES[team.id];
+    setDecisionSubStep(0);
     if (conseq) {
       setConsequence(conseq);
       setPendingPhase('decision-extension');
@@ -118,6 +123,7 @@ export default function LeBronFilesPage() {
     const deals = ENDORSEMENT_DEALS.filter(d => selectedEndorsements.includes(d.id));
     const totalEndorsementValue = deals.reduce((s, d) => s + d.baseValue * 8, 0);
     const brandValue = deals.reduce((s, d) => s + d.fitScore * 10, 0);
+    const highRiskDeal = deals.find(d => d.scandalRisk >= 7);
     setCareer(c => ({
       ...c,
       endorsements: deals,
@@ -125,7 +131,12 @@ export default function LeBronFilesPage() {
       brandValue: c.brandValue + brandValue,
     }));
     setRevealedStep(false);
-    setPhase('decision-2018');
+    if (highRiskDeal) {
+      setPendingScandal({ brand: highRiskDeal.brand, risk: highRiskDeal.scandalRisk });
+      setPhase('scandal-event');
+    } else {
+      setPhase('decision-2018');
+    }
   }
 
   function confirmTeamChoice2018() {
@@ -144,6 +155,7 @@ export default function LeBronFilesPage() {
       legacyScore: c.legacyScore + (rings * 10) + (selectedTeam === 'lakers' ? 5 : 0),
     }));
     setRevealedStep(false);
+    setDecisionSubStep(0);
     setPhase('investments');
   }
 
@@ -242,13 +254,83 @@ export default function LeBronFilesPage() {
 
   // ── DECISION 2010 ───────────────────────────────────────────────────────────
   if (phase === 'decision-2010') {
+    // Sub-step 0: Team pitches overview
+    if (decisionSubStep === 0) {
+      return (
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="mb-6">
+            <div className="text-xs text-[#64748b] uppercase tracking-widest mb-1">PHASE 1 · STEP 1 OF 2</div>
+            <h1 className="text-2xl font-black text-white">The Phone Keeps Ringing</h1>
+            <p className="text-[#94a3b8] text-sm">Summer 2010. LeBron&apos;s rookie deal just expired. Six teams are making their pitch. Read each team&apos;s offer before you decide.</p>
+          </div>
+          {!isAdvanced && (
+            <HintBox>Before you choose, understand what each team is offering. Championship odds, market size, and roster quality all matter differently depending on what LeBron wants most.</HintBox>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {TEAM_OPTIONS_2010.map(team => {
+              const oddsLabel = team.champOdds > 0.5 ? { text: 'High odds', color: '#10b981' } : team.champOdds > 0.25 ? { text: 'Medium odds', color: '#f59e0b' } : { text: 'Low odds', color: '#ef4444' };
+              return (
+                <div key={team.id} className="p-4 bg-[#1a2035] rounded-xl border border-[#1e293b]">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <div className="font-black text-white">{team.city} {team.name}</div>
+                      <div className="text-xs text-[#64748b]">{team.rosterNotes}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs font-bold" style={{ color: oddsLabel.color }}>{oddsLabel.text}</div>
+                      <div className="text-xs text-[#64748b]">{(team.champOdds * 100).toFixed(0)}% champ odds</div>
+                    </div>
+                  </div>
+                  {/* Odds meter bar */}
+                  <div className="mb-3">
+                    <div className="flex justify-between text-[10px] text-[#64748b] mb-1">
+                      <span>Championship Probability</span>
+                      <span style={{ color: oddsLabel.color }}>{(team.champOdds * 100).toFixed(0)}%</span>
+                    </div>
+                    <div className="h-2 bg-[#1e293b] rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${team.champOdds * 100}%`, backgroundColor: oddsLabel.color }} />
+                    </div>
+                    {!isAdvanced && (
+                      <div className="text-[10px] text-[#64748b] mt-1">
+                        {team.champOdds > 0.5 ? `With ${(team.champOdds * 100).toFixed(0)}% odds over 4 years → likely 2 rings` :
+                         team.champOdds > 0.25 ? `With ${(team.champOdds * 100).toFixed(0)}% odds → could get 1 ring` :
+                         `With ${(team.champOdds * 100).toFixed(0)}% odds → ring is unlikely in 4 years`}
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="text-center"><div className="text-[#f59e0b] font-bold">${team.maxSalary.toFixed(0)}M</div><div className="text-[#64748b]">Max offer</div></div>
+                    <div className="text-center"><div className="text-[#3b82f6] font-bold">{team.endorsementMarket}/10</div><div className="text-[#64748b]">Market size</div></div>
+                    <div className="text-center"><div className="text-[#8b5cf6] font-bold">{team.legacyScore}/10</div><div className="text-[#64748b]">Legacy fit</div></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {!isAdvanced && (
+            <div className="p-3 bg-[#111827] rounded-xl border border-[#1e293b] mb-4 text-xs text-[#94a3b8]">
+              <span className="text-[#f59e0b] font-bold">How Champ Odds Work:</span> These factor in roster talent, coaching staff, and conference competition. Higher % = better shot at rings over 4 years. But nothing is guaranteed — Dallas (15% odds) won the 2011 title as an underdog.
+            </div>
+          )}
+          <button
+            onClick={() => setDecisionSubStep(1)}
+            className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl text-lg hover:bg-[#fbbf24] transition-colors"
+          >
+            I&apos;VE SEEN ENOUGH — MAKE MY DECISION →
+          </button>
+        </div>
+      );
+    }
+
+    // Sub-step 1: Final team + contract selection
     return (
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <div className="text-xs text-[#64748b] uppercase tracking-widest mb-1">PHASE 1 OF 4</div>
+          <div className="text-xs text-[#64748b] uppercase tracking-widest mb-1">PHASE 1 · STEP 2 OF 2</div>
           <h1 className="text-2xl font-black text-white">2010 Free Agency: The Decision</h1>
           <p className="text-[#94a3b8] text-sm">LeBron has finished his rookie deal in Cleveland. 6 teams want him. Where does he go?</p>
         </div>
+        <button onClick={() => setDecisionSubStep(0)} className="text-xs text-[#64748b] hover:text-white mb-4">← Back to team pitches</button>
 
         {!isAdvanced && (
           <HintBox>
@@ -257,7 +339,9 @@ export default function LeBronFilesPage() {
         )}
 
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-          {TEAM_OPTIONS_2010.map(team => (
+          {TEAM_OPTIONS_2010.map(team => {
+            const oddsLabel = team.champOdds > 0.5 ? '#10b981' : team.champOdds > 0.25 ? '#f59e0b' : '#ef4444';
+            return (
             <button
               key={team.id}
               onClick={() => setSelectedTeam(team.id)}
@@ -269,9 +353,13 @@ export default function LeBronFilesPage() {
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs">
                   <span className="text-[#64748b]">🏆 Champ Odds</span>
-                  <span className="font-bold" style={{ color: team.champOdds > 0.5 ? '#10b981' : team.champOdds > 0.2 ? '#f59e0b' : '#ef4444' }}>
+                  <span className="font-bold" style={{ color: oddsLabel }}>
                     {(team.champOdds * 100).toFixed(0)}%
                   </span>
+                </div>
+                {/* Odds meter bar */}
+                <div className="h-1.5 bg-[#1e293b] rounded-full overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${team.champOdds * 100}%`, backgroundColor: oddsLabel }} />
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-[#64748b]">💰 Max Salary</span>
@@ -296,7 +384,8 @@ export default function LeBronFilesPage() {
                 {!isAdvanced && <div className="text-xs text-[#94a3b8] mt-2 border-t border-[#1e293b] pt-2">{team.rosterNotes}</div>}
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
 
         {selectedTeam && (
@@ -361,13 +450,72 @@ export default function LeBronFilesPage() {
   // ── DECISION EXTENSION (Endorsements) ──────────────────────────────────────
   if (phase === 'decision-extension') {
     const team = career.chosenTeam2010;
+
+    // Sub-step 0: brand approach pitch screen
+    if (decisionSubStep === 0) {
+      return (
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="mb-6">
+            <div className="text-xs text-[#64748b] uppercase tracking-widest mb-1">PHASE 2 · STEP 1 OF 2</div>
+            <h1 className="text-2xl font-black text-white">The Brands Come Calling</h1>
+            <p className="text-[#94a3b8] text-sm">7 companies want LeBron&apos;s name on their product. Each deal has different risk and reward. Review before you choose.</p>
+          </div>
+          {!isAdvanced && (
+            <HintBox>High scandal risk = real risk of losing the deal and your reputation. Exclusivity = you can&apos;t sign competing brands. Look before you leap.</HintBox>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            {ENDORSEMENT_DEALS.map(deal => (
+              <div key={deal.id} className="p-4 bg-[#1a2035] rounded-xl border border-[#1e293b]">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl">{deal.icon}</span>
+                  <div>
+                    <div className="font-bold text-white">{deal.brand}</div>
+                    <div className="text-xs text-[#64748b]">{deal.category}</div>
+                  </div>
+                  <div className="ml-auto text-right">
+                    <div className="text-[#f59e0b] font-black">${deal.baseValue.toFixed(0)}M/yr</div>
+                    <div className="text-xs text-[#64748b]">+{deal.upsidePct}% upside</div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[#64748b]">Scandal Risk:</span>
+                    <div className="h-1.5 w-16 bg-[#1e293b] rounded-full overflow-hidden ml-1">
+                      <div className="h-full rounded-full" style={{ width: `${deal.scandalRisk * 10}%`, backgroundColor: deal.scandalRisk >= 7 ? '#ef4444' : deal.scandalRisk >= 4 ? '#f59e0b' : '#10b981' }} />
+                    </div>
+                    <span style={{ color: deal.scandalRisk >= 7 ? '#ef4444' : deal.scandalRisk >= 4 ? '#f59e0b' : '#10b981' }}>{deal.scandalRisk}/10</span>
+                  </div>
+                  {deal.exclusivity.length > 0 && (
+                    <span className="text-[#64748b]">Blocks: {deal.exclusivity.slice(0, 2).join(', ')}</span>
+                  )}
+                </div>
+                {deal.scandalRisk >= 7 && !isAdvanced && (
+                  <div className="mt-2 text-[10px] text-[#ef4444] bg-red-950/30 rounded p-1.5">
+                    ⚠️ High risk — if a controversy erupts, this deal could cost you legacy points
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => setDecisionSubStep(1)}
+            className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl text-lg hover:bg-[#fbbf24] transition-colors"
+          >
+            CHOOSE YOUR DEALS →
+          </button>
+        </div>
+      );
+    }
+
+    // Sub-step 1: deal selection (existing screen)
     return (
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <div className="text-xs text-[#64748b] uppercase tracking-widest mb-1">PHASE 2 OF 4</div>
+          <div className="text-xs text-[#64748b] uppercase tracking-widest mb-1">PHASE 2 · STEP 2 OF 2</div>
           <h1 className="text-2xl font-black text-white">Build LeBron&apos;s Brand</h1>
           <p className="text-[#94a3b8] text-sm">While playing for {team?.city}, companies are lining up. Choose wisely — some deals conflict.</p>
         </div>
+        <button onClick={() => setDecisionSubStep(0)} className="text-xs text-[#64748b] hover:text-white mb-4">← Back to brand overview</button>
 
         <div className="flex items-center gap-4 mb-6 p-3 bg-[#111827] rounded-xl border border-[#1e293b]">
           <div>
@@ -489,7 +637,9 @@ export default function LeBronFilesPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-6">
-          {teams2018.map(team => (
+          {teams2018.map(team => {
+            const oddsColor = team.champOdds > 0.45 ? '#10b981' : team.champOdds > 0.25 ? '#f59e0b' : '#ef4444';
+            return (
             <button
               key={team.id}
               onClick={() => setSelectedTeam(team.id)}
@@ -500,9 +650,12 @@ export default function LeBronFilesPage() {
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-[#64748b]">🏆 Champ Odds</span>
-                  <span className="font-bold" style={{ color: team.champOdds > 0.45 ? '#10b981' : team.champOdds > 0.25 ? '#f59e0b' : '#ef4444' }}>
+                  <span className="font-bold" style={{ color: oddsColor }}>
                     {(team.champOdds * 100).toFixed(0)}%
                   </span>
+                </div>
+                <div className="h-1.5 bg-[#1e293b] rounded-full overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${team.champOdds * 100}%`, backgroundColor: oddsColor }} />
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#64748b]">💰 Max Offer</span>
@@ -511,7 +664,8 @@ export default function LeBronFilesPage() {
                 {!isAdvanced && <div className="text-[#94a3b8] mt-2 border-t border-[#1e293b] pt-2">{team.youngCore}</div>}
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
 
         {selectedTeam && (
@@ -550,13 +704,68 @@ export default function LeBronFilesPage() {
     const availableInvestments = INVESTMENT_OPTIONS.filter(i => i.yearAvailable <= 2021);
     const totalInvested = availableInvestments.filter(i => selectedInvestments.includes(i.id)).reduce((s, i) => s + i.costBasis, 0);
 
+    // Sub-step 0: financial math explainer
+    if (decisionSubStep === 0) {
+      const examples = [
+        { invest: 5, years: 15, rate: 8, result: Math.round(5 * Math.pow(1.08, 15)) },
+        { invest: 10, years: 20, rate: 8, result: Math.round(10 * Math.pow(1.08, 20)) },
+        { invest: 20, years: 25, rate: 8, result: Math.round(20 * Math.pow(1.08, 25)) },
+      ];
+      return (
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <div className="mb-6">
+            <div className="text-xs text-[#64748b] uppercase tracking-widest mb-1">PHASE 4 · STEP 1 OF 2</div>
+            <h1 className="text-2xl font-black text-white">How Money Actually Grows</h1>
+            <p className="text-[#94a3b8] text-sm">Before you invest, understand WHY investing turns millions into billions.</p>
+          </div>
+          <div className="p-4 bg-[#111827] rounded-xl border border-[#1e293b] mb-6">
+            <div className="text-sm font-bold text-white mb-3">The Magic Formula: Compound Growth</div>
+            <div className="font-mono text-[#f59e0b] text-sm mb-3 p-2 bg-[#0a0e1a] rounded-lg">
+              Future Value = Investment × (1 + Rate)^Years
+            </div>
+            {!isAdvanced && <p className="text-xs text-[#94a3b8] mb-4">Money grows not just on what you put in — it grows on the growth too. That&apos;s why LeBron&apos;s $10M investment in Liverpool FC turned into $111M. The stock market averages ~8% per year.</p>}
+            <div className="space-y-3">
+              {examples.map(ex => (
+                <div key={ex.invest} className="p-3 bg-[#0a0e1a] rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white text-sm font-bold">${ex.invest}M invested at 8%/yr for {ex.years} years</span>
+                    <span className="text-[#10b981] font-black text-lg">${ex.result}M</span>
+                  </div>
+                  <div className="h-2 bg-[#1e293b] rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-[#f59e0b] to-[#10b981] rounded-full" style={{ width: `${Math.min(100, (ex.result / 140) * 100)}%` }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-[#64748b] mt-1">
+                    <span>Started: ${ex.invest}M</span>
+                    <span className="text-[#10b981]">{(ex.result / ex.invest).toFixed(0)}x return</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-3 bg-[#2a1f00] rounded-xl border border-[#f59e0b]/30 mb-6 text-xs text-[#e2e8f0]">
+            <span className="text-[#f59e0b] font-bold">Real LeBron: </span>
+            Invested ~$1M in Liverpool FC in 2011 when it was worth $300M total. By 2021, Liverpool was worth $4.1B — LeBron&apos;s share: <span className="text-[#10b981] font-bold">~$45M</span>.
+            That&apos;s how $1M becomes $45M. Compounding + choosing right.
+          </div>
+          <button
+            onClick={() => setDecisionSubStep(1)}
+            className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl text-lg hover:bg-[#fbbf24] transition-colors"
+          >
+            NOW CHOOSE WHERE TO INVEST →
+          </button>
+        </div>
+      );
+    }
+
+    // Sub-step 1: investment selection (existing screen)
     return (
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <div className="text-xs text-[#64748b] uppercase tracking-widest mb-1">PHASE 4 OF 4</div>
+          <div className="text-xs text-[#64748b] uppercase tracking-widest mb-1">PHASE 4 · STEP 2 OF 2</div>
           <h1 className="text-2xl font-black text-white">Build the Empire</h1>
           <p className="text-[#94a3b8] text-sm">LeBron has earned big. Now where does he invest? Real investments, real returns.</p>
         </div>
+        <button onClick={() => setDecisionSubStep(0)} className="text-xs text-[#64748b] hover:text-white mb-4">← Back to how money grows</button>
 
         {!isAdvanced && (
           <HintBox>
@@ -611,6 +820,57 @@ export default function LeBronFilesPage() {
           className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl text-lg disabled:opacity-40"
         >
           SEE LEBRON&apos;S FINAL STORY →
+        </button>
+      </div>
+    );
+  }
+
+  // ── SCANDAL EVENT ────────────────────────────────────────────────────────────
+  if (phase === 'scandal-event' && pendingScandal) {
+    function resolveScandal() {
+      setCareer(c => ({
+        ...c,
+        legacyScore: c.legacyScore - 12,
+        brandValue: c.brandValue - 10,
+      }));
+      setPendingScandal(null);
+      setPhase('decision-2018');
+    }
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <div className="text-xs text-[#ef4444] uppercase tracking-widest mb-1 font-bold">⚠️ CONTROVERSY ALERT</div>
+          <h1 className="text-2xl font-black text-white">Scandal: {pendingScandal.brand}</h1>
+          <p className="text-[#94a3b8] text-sm">A major controversy erupted with your {pendingScandal.brand} deal. The internet is on fire.</p>
+        </div>
+        <div className="p-6 bg-[#1a0505] rounded-xl border-2 border-[#ef4444]/50 mb-6">
+          <div className="text-4xl mb-4 text-center">📰</div>
+          <p className="text-[#e2e8f0] text-sm leading-relaxed mb-4">
+            Your {pendingScandal.brand} partnership (Scandal Risk: {pendingScandal.risk}/10) attracted intense media scrutiny.
+            Activists, fans, and rival brands all weighed in. The controversy dominated the news cycle for weeks,
+            overshadowing your on-court performance and forcing brands to distance themselves.
+          </p>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="p-3 bg-[#0a0e1a] rounded-lg text-center">
+              <div className="text-[#ef4444] font-black text-xl">–12</div>
+              <div className="text-xs text-[#64748b]">Legacy Score</div>
+            </div>
+            <div className="p-3 bg-[#0a0e1a] rounded-lg text-center">
+              <div className="text-[#ef4444] font-black text-xl">–$10M</div>
+              <div className="text-xs text-[#64748b]">Brand Value</div>
+            </div>
+          </div>
+          <div className="p-3 bg-[#111827] rounded-lg text-xs text-[#94a3b8]">
+            <span className="text-[#f59e0b] font-bold">Real LeBron: </span>
+            LeBron vets every partnership carefully. He famously rejected deals that conflicted with his community values,
+            even when the money was enormous. His brand discipline is why he&apos;s trusted by Nike, Beats, and Apple for decades.
+          </div>
+        </div>
+        <button
+          onClick={resolveScandal}
+          className="w-full py-3 bg-[#ef4444] text-white font-black rounded-xl hover:bg-red-600 transition-colors"
+        >
+          MANAGE THE FALLOUT → CONTINUE TO 2018
         </button>
       </div>
     );
@@ -682,6 +942,16 @@ export default function LeBronFilesPage() {
     const realLeBronRings = 4;
     const realLeBronLegacy = 92;
 
+    // Legacy breakdown — itemize each contribution
+    const legacyBreakdown = [
+      { source: 'Starting legacy (baseline)', amount: 50, color: '#64748b' },
+      { source: `Team choice 2010 (${career.chosenTeam2010?.city || '—'})`, amount: career.chosenTeam2010 ? career.chosenTeam2010.legacyScore - 5 : 0, color: '#3b82f6' },
+      { source: `Rings from 2010 era (${career.rings > 0 ? Math.min(career.rings, 2) : 0}×8)`, amount: Math.min(career.rings, 2) * 8, color: '#f59e0b' },
+      { source: `Team choice 2018 (${career.chosenTeam2018 || '—'})`, amount: career.chosenTeam2018 === 'lakers' ? 5 : 0, color: '#8b5cf6' },
+      { source: 'Rings from 2018 era', amount: (career.rings > 2 ? 1 : 0) * 10, color: '#f59e0b' },
+      { source: `Investment cultural impact`, amount: career.investments.reduce((s, i) => s + i.culturalImpact, 0), color: '#10b981' },
+    ].filter(b => b.amount !== 0);
+
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-black text-white mb-2">LeBron&apos;s Final Story</h1>
@@ -707,6 +977,24 @@ export default function LeBronFilesPage() {
           ))}
         </div>
 
+        {/* Legacy Report Card */}
+        <div className="p-5 bg-[#111827] rounded-xl border border-[#1e293b] mb-6">
+          <div className="text-xs text-[#f59e0b] font-bold uppercase tracking-widest mb-3">📊 Legacy Score Breakdown</div>
+          <div className="text-xs text-[#64748b] mb-3">Legacy = multiple compounding factors, not just rings</div>
+          <div className="space-y-2">
+            {legacyBreakdown.map(b => (
+              <div key={b.source} className="flex items-center justify-between text-xs">
+                <span className="text-[#94a3b8]">{b.source}</span>
+                <span className="font-bold" style={{ color: b.color }}>{b.amount > 0 ? '+' : ''}{b.amount}</span>
+              </div>
+            ))}
+            <div className="border-t border-[#1e293b] pt-2 flex items-center justify-between text-sm font-bold">
+              <span className="text-white">Total Legacy Score</span>
+              <span className="text-[#f59e0b]">{Math.min(100, career.legacyScore)}/100</span>
+            </div>
+          </div>
+        </div>
+
         <div className="p-5 bg-[#111827] rounded-xl border border-[#1e293b] mb-6">
           <div className="text-xs text-[#f59e0b] font-bold mb-3 uppercase tracking-widest">📰 LeBron&apos;s Real Decisions</div>
           <div className="space-y-2">
@@ -722,7 +1010,7 @@ export default function LeBronFilesPage() {
 
         <div className="flex gap-3">
           <button
-            onClick={() => { setPhase('intro'); setCareer({ chosenTeam2010: null, contractChoice2010: null, endorsements: [], extensions: [], chosenTeam2018: null, contractChoice2018: null, investments: [], rings: 0, earnings: 0, legacyScore: 50, portfolioValue: 0, brandValue: 0 }); setSelectedTeam(null); setSelectedContract(null); setSelectedEndorsements([]); setSelectedInvestments([]); setRevealedStep(false); }}
+            onClick={() => { setPhase('intro'); setCareer({ chosenTeam2010: null, contractChoice2010: null, endorsements: [], extensions: [], chosenTeam2018: null, contractChoice2018: null, investments: [], rings: 0, earnings: 0, legacyScore: 50, portfolioValue: 0, brandValue: 0 }); setSelectedTeam(null); setSelectedContract(null); setSelectedEndorsements([]); setSelectedInvestments([]); setRevealedStep(false); setDecisionSubStep(0); setPendingScandal(null); }}
             className="flex-1 py-3 bg-[#f59e0b] text-black font-black rounded-xl"
           >
             REPLAY

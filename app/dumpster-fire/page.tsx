@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CAP_NIGHTMARE_SCENARIOS, REBUILD_TOOLS, MLE_FREE_AGENTS, PRESS_EVENTS } from '@/data/capNightmareTeams';
 import type { CapNightmareScenario, CapPlayer } from '@/data/capNightmareTeams';
 import { calculateLuxuryTax, formatMoneyShort, stretchProvision } from '@/lib/CapMath';
@@ -24,6 +24,13 @@ interface RebuildState {
   mleUsed: boolean;
 }
 
+interface FlashEntry {
+  tool: string;
+  player: string;
+  capEffect: string;
+  lesson: string;
+}
+
 export default function DumpsterFirePage() {
   const [track, setTrack] = useState<'5-6' | '7-8'>('5-6');
   const [phase, setPhase] = useState<Phase>('select');
@@ -39,8 +46,18 @@ export default function DumpsterFirePage() {
   const [showMlePanel, setShowMlePanel] = useState(false);
   const [pendingPressEvent, setPendingPressEvent] = useState<typeof PRESS_EVENTS[0] | null>(null);
   const [pendingNextPhase, setPendingNextPhase] = useState<Phase | null>(null);
+  const [selectedScenarioPreview, setSelectedScenarioPreview] = useState<CapNightmareScenario | null>(null);
+  const [flashEntry, setFlashEntry] = useState<FlashEntry | null>(null);
+  const [showMoraleFormula, setShowMoraleFormula] = useState(false);
 
   const isAdvanced = track === '7-8';
+
+  // Auto-clear flash entry after 5 seconds
+  useEffect(() => {
+    if (!flashEntry) return;
+    const id = setTimeout(() => setFlashEntry(null), 5000);
+    return () => clearTimeout(id);
+  }, [flashEntry]);
 
   function selectScenario(scenario: CapNightmareScenario) {
     setState({
@@ -61,6 +78,7 @@ export default function DumpsterFirePage() {
     setPhase('year1');
     setErrorMessage(null);
     setShowMlePanel(false);
+    setFlashEntry(null);
   }
 
   function applyTool(tool: string, playerId: string) {
@@ -121,6 +139,26 @@ export default function DumpsterFirePage() {
     newMorale = Math.max(0, Math.min(100, newMorale));
     newStarMorale -= player.moraleImpact > 2 ? 10 : 0;
     newStarMorale = Math.max(0, Math.min(100, newStarMorale));
+
+    // Build educational flash entry
+    let flashCapEffect = '';
+    let flashLesson = '';
+    if (tool === 'trade') {
+      flashCapEffect = `Freed ${formatMoneyShort(player.salary)}/yr in cap space. Win% dipped by ${(player.rating / 1000 * 100).toFixed(1)}%.`;
+      flashLesson = 'Trading cuts payroll instantly, but a thinner roster means fewer wins — which can actually improve your draft lottery odds next year.';
+    } else if (tool === 'stretch') {
+      const { yearsSpread, perYearAmount } = stretchProvision(player.salary, player.yearsLeft);
+      const totalOld = player.salary * player.yearsLeft;
+      flashCapEffect = `Saves ${formatMoneyShort(player.salary - perYearAmount)}/yr now. Creates ${formatMoneyShort(perYearAmount)}/yr dead money for ${yearsSpread} years ($${totalOld.toFixed(0)}M total).`;
+      flashLesson = 'The stretch provision is a debt delay — not forgiveness. Real GMs use it when immediate relief outweighs the long-term cap hit. It\'s a last resort.';
+    } else if (tool === 'buyout') {
+      const buyoutPenalty = player.salary * 0.3;
+      flashCapEffect = `Eating ${formatMoneyShort(buyoutPenalty)} in dead money (30% of salary). Player is now a free agent and can sign anywhere.`;
+      flashLesson = 'Buyouts let veterans chase rings elsewhere. The team eats ~30% of remaining salary. Kevin Durant used this with Brooklyn in 2023 to join Phoenix.';
+    }
+    if (flashCapEffect) {
+      setFlashEntry({ tool: tool.toUpperCase(), player: player.name, capEffect: flashCapEffect, lesson: flashLesson });
+    }
 
     setState(s => ({
       ...s,
@@ -222,6 +260,110 @@ export default function DumpsterFirePage() {
   }
 
   if (phase === 'select') {
+    // STAGE 2: Detailed situation preview before starting
+    if (selectedScenarioPreview) {
+      const s = selectedScenarioPreview;
+      const tax = calculateLuxuryTax(s.startingCapSituation.totalSalary);
+      const overCap = s.startingCapSituation.totalSalary - s.startingCapSituation.capLine;
+      return (
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <button onClick={() => setSelectedScenarioPreview(null)} className="text-[#64748b] hover:text-white text-sm mb-4 block">← Back to scenarios</button>
+
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-xs text-[#ef4444] font-bold uppercase tracking-widest">📋 Situation Brief</span>
+          </div>
+          <h1 className="text-2xl font-black text-white mb-1">{s.title}</h1>
+          <p className="text-[#64748b] text-sm mb-6">{s.year} season · You are the new GM of the {s.team}</p>
+
+          <div className="p-4 bg-[#1a0505] border border-red-800/50 rounded-xl mb-5 text-sm text-[#e2e8f0] leading-relaxed">
+            {s.description}
+          </div>
+
+          {/* Cap numbers breakdown */}
+          <div className="mb-5">
+            <div className="text-xs text-[#64748b] uppercase tracking-widest mb-3">💰 The Financial Reality</div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Total Payroll', value: formatMoneyShort(s.startingCapSituation.totalSalary), color: '#ef4444', note: 'What you owe players' },
+                { label: 'Salary Cap', value: formatMoneyShort(s.startingCapSituation.capLine), color: '#64748b', note: 'The league limit' },
+                { label: 'Over the Cap', value: `+${formatMoneyShort(overCap)}`, color: '#ef4444', note: 'You can\'t add salary here' },
+                { label: 'Luxury Tax Owed', value: tax > 0 ? `+${formatMoneyShort(tax)}` : 'None', color: tax > 0 ? '#f59e0b' : '#10b981', note: tax > 0 ? 'Extra penalty to the league' : 'Under the tax line' },
+              ].map(({ label, value, color, note }) => (
+                <div key={label} className="p-3 bg-[#111827] rounded-xl border border-[#1e293b]">
+                  <div className="font-black text-base" style={{ color }}>{value}</div>
+                  <div className="text-xs font-semibold text-white">{label}</div>
+                  <div className="text-xs text-[#64748b]">{note}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Key players */}
+          <div className="mb-5">
+            <div className="text-xs text-[#64748b] uppercase tracking-widest mb-3">🏀 Key Players You Inherit</div>
+            <div className="space-y-2">
+              {s.players.slice(0, 5).map(p => (
+                <div key={p.id} className="flex items-center justify-between p-3 bg-[#111827] rounded-xl border border-[#1e293b]">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-[#64748b] w-6">{p.position}</span>
+                    <div>
+                      <div className="text-sm font-bold text-white">{p.name}</div>
+                      <div className="text-xs text-[#64748b]">Age {p.age} · {p.yearsLeft}yr left</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span style={{ color: p.rating >= 75 ? '#10b981' : p.rating >= 60 ? '#f59e0b' : '#ef4444' }}>{p.rating} OVR</span>
+                    <span className="text-[#f59e0b] font-bold">{formatMoneyShort(p.salary)}/yr</span>
+                    {p.moraleImpact <= -3 && <span className="text-red-400 text-xs">⚠️ Problem</span>}
+                    {p.canBeBoughtOut && <span className="text-blue-400 text-xs">Buyout OK</span>}
+                    {p.canBeStretched && <span className="text-purple-400 text-xs">Stretchable</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Morale situation */}
+          <div className="mb-5 grid grid-cols-2 gap-3">
+            {[
+              { label: 'Star Morale', value: s.starMorale, warn: s.starWantsOut },
+              { label: 'Locker Room', value: s.lockerRoomMorale, warn: s.lockerRoomMorale < 40 },
+            ].map(({ label, value, warn }) => (
+              <div key={label} className="p-3 bg-[#111827] rounded-xl border border-[#1e293b]">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-[#64748b]">{label}</span>
+                  <span className="text-xs font-bold" style={{ color: value >= 60 ? '#10b981' : value >= 40 ? '#f59e0b' : '#ef4444' }}>{value}%</span>
+                </div>
+                <div className="h-2 bg-[#1e293b] rounded-full overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${value}%`, background: value >= 60 ? '#10b981' : value >= 40 ? '#f59e0b' : '#ef4444' }} />
+                </div>
+                {warn && <div className="text-xs text-red-400 mt-1">⚠️ {label === 'Star Morale' ? 'Star may demand trade soon' : 'Team chemistry is fractured'}</div>}
+              </div>
+            ))}
+          </div>
+
+          {/* Your goal */}
+          <div className="p-4 bg-[#0a1520] border border-[#3b82f6]/30 rounded-xl mb-6">
+            <div className="text-xs text-[#3b82f6] font-bold mb-2">🎯 Your Mission Over 3 Years</div>
+            <div className="space-y-1 text-sm text-[#94a3b8]">
+              <div>• Get payroll below the luxury tax line ({formatMoneyShort(s.startingCapSituation.taxLine)})</div>
+              <div>• Keep star morale above 0 — or execute a trade-demand scenario</div>
+              <div>• Build future assets: picks and young players</div>
+              <div>• Score higher than the real GM did ({s.realOutcome.score}/100)</div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => { selectScenario(s); setSelectedScenarioPreview(null); }}
+            className="w-full py-4 bg-[#ef4444] text-white font-black rounded-xl text-lg hover:bg-red-500 transition-colors"
+          >
+            BEGIN YEAR 1 — TAKE OVER AS GM →
+          </button>
+        </div>
+      );
+    }
+
+    // STAGE 1: Scenario selection list
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6 p-3 bg-[#111827] rounded-xl border border-[#1e293b]">
@@ -250,7 +392,7 @@ export default function DumpsterFirePage() {
             return (
               <button
                 key={s.id}
-                onClick={() => selectScenario(s)}
+                onClick={() => setSelectedScenarioPreview(s)}
                 className="text-left p-5 bg-[#1a2035] rounded-xl border border-[#1e293b] hover:border-[#ef4444] transition-all group"
               >
                 <div className="flex items-start justify-between mb-2">
@@ -271,6 +413,9 @@ export default function DumpsterFirePage() {
                   </span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-[#1a2035] text-[#64748b]">
                     {s.startingCapSituation.picks.length} picks left
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#1a2035] text-[#64748b] ml-auto">
+                    Read full brief →
                   </span>
                 </div>
               </button>
@@ -423,9 +568,28 @@ export default function DumpsterFirePage() {
         </div>
       )}
 
+      {taxBill > 0 && (
+        <div className="mb-4 p-3 bg-amber-900/20 border border-amber-600 rounded-xl text-sm text-amber-400 flex items-center justify-between">
+          <span>⚠️ <strong>{formatMoneyShort(taxBill)}</strong> over the luxury tax line — the league charges $1.50 for every $1 over. Penalty: <strong>~{formatMoneyShort(taxBill * 1.5)}</strong>/yr.</span>
+        </div>
+      )}
+
       {state.mleUsed && (
         <div className="mb-4 p-3 bg-blue-900/20 border border-blue-700 rounded-xl text-xs text-blue-400">
           ✍️ MLE used this season — resets next year.
+        </div>
+      )}
+
+      {/* Decision Impact Flash */}
+      {flashEntry && (
+        <div className="mb-4 p-4 bg-[#0a2010] border-2 border-[#10b981] rounded-xl">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-[#10b981] font-bold uppercase tracking-widest">📋 Decision Impact: {flashEntry.tool}</span>
+            <button onClick={() => setFlashEntry(null)} className="text-[#64748b] hover:text-white text-xs">✕</button>
+          </div>
+          <div className="text-sm font-bold text-white mb-1">{flashEntry.player}</div>
+          <div className="text-sm text-[#10b981] mb-2">{flashEntry.capEffect}</div>
+          <div className="text-xs text-[#94a3b8] italic border-t border-[#1e293b] pt-2">{flashEntry.lesson}</div>
         </div>
       )}
 
@@ -478,31 +642,39 @@ export default function DumpsterFirePage() {
         <div>
           <div className="text-xs text-[#64748b] uppercase tracking-widest mb-3">GM Tools</div>
           <div className="space-y-2 mb-4">
-            {REBUILD_TOOLS.map(tool => (
-              <button
-                key={tool.id}
-                onClick={() => {
-                  if (tool.id === 'tank') {
-                    applyTool('tank', '');
-                  } else if (tool.id === 'mle') {
-                    setShowMlePanel(!showMlePanel);
-                    setSelectedTool(null);
-                  } else {
-                    setSelectedTool(selectedTool === tool.id ? null : tool.id);
-                    setShowMlePanel(false);
-                  }
-                }}
-                className={`w-full text-left p-3 rounded-xl border transition-all ${selectedTool === tool.id || (tool.id === 'mle' && showMlePanel) ? 'border-[#f59e0b] bg-[#2a1f00]' : 'border-[#1e293b] bg-[#111827] hover:border-[#64748b]'} ${tool.id === 'mle' && state.mleUsed ? 'opacity-50 cursor-not-allowed' : ''}`}
-                disabled={tool.id === 'mle' && state.mleUsed}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span>{tool.icon}</span>
-                  <span className="text-sm font-bold text-white">{tool.name}</span>
-                  {tool.id === 'mle' && state.mleUsed && <span className="text-xs text-[#64748b]">(used)</span>}
-                </div>
-                {!isAdvanced && <p className="text-xs text-[#64748b]">{tool.description}</p>}
-              </button>
-            ))}
+            {REBUILD_TOOLS.map(tool => {
+              const isSelected = selectedTool === tool.id || (tool.id === 'mle' && showMlePanel);
+              return (
+                <button
+                  key={tool.id}
+                  onClick={() => {
+                    if (tool.id === 'tank') {
+                      applyTool('tank', '');
+                    } else if (tool.id === 'mle') {
+                      setShowMlePanel(!showMlePanel);
+                      setSelectedTool(null);
+                    } else {
+                      setSelectedTool(selectedTool === tool.id ? null : tool.id);
+                      setShowMlePanel(false);
+                    }
+                  }}
+                  className={`w-full text-left p-3 rounded-xl border transition-all ${isSelected ? 'border-[#f59e0b] bg-[#2a1f00]' : 'border-[#1e293b] bg-[#111827] hover:border-[#64748b]'} ${tool.id === 'mle' && state.mleUsed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={tool.id === 'mle' && state.mleUsed}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span>{tool.icon}</span>
+                    <span className="text-sm font-bold text-white">{tool.name}</span>
+                    {tool.id === 'mle' && state.mleUsed && <span className="text-xs text-[#64748b]">(used)</span>}
+                  </div>
+                  {!isAdvanced && <p className="text-xs text-[#64748b]">{tool.description}</p>}
+                  {isSelected && (
+                    <p className="text-xs text-[#3b82f6] mt-1.5 italic border-t border-[#f59e0b]/20 pt-1.5">
+                      📖 Real NBA: {tool.realWorldExample}
+                    </p>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* MLE free agent panel */}
@@ -604,6 +776,11 @@ export default function DumpsterFirePage() {
   const grade = overall >= 80 ? 'A' : overall >= 65 ? 'B' : overall >= 50 ? 'C' : overall >= 35 ? 'D' : 'F';
   const gradeColor = grade === 'A' ? '#10b981' : grade === 'B' ? '#f59e0b' : grade === 'C' ? '#3b82f6' : '#ef4444';
 
+  // Morale → Win% formula: winPctBonus = (starMorale - 50) / 1000
+  const moraleBonus = (state.starMorale - 50) / 1000;
+  const moraleWinAdj = Math.round(moraleBonus * 82 * 10) / 10; // fractional wins
+  const taxPenaltyPoints = scores.taxBill > 0 ? Math.round(scores.taxBill * 5) : 0;
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-black text-white mb-6">3-Year Rebuild Verdict</h1>
@@ -628,6 +805,39 @@ export default function DumpsterFirePage() {
         ))}
       </div>
 
+      {/* Morale → Win% explanation */}
+      <div className="p-4 bg-[#111827] rounded-xl border border-[#1e293b] mb-4">
+        <button
+          onClick={() => setShowMoraleFormula(!showMoraleFormula)}
+          className="w-full flex items-center justify-between text-left"
+        >
+          <span className="text-xs text-[#64748b] font-bold uppercase tracking-widest">📊 How Morale Affected Your Win%</span>
+          <span className="text-[#64748b] text-xs">{showMoraleFormula ? '▲ Hide' : '▼ Show'}</span>
+        </button>
+        {showMoraleFormula && (
+          <div className="mt-3 space-y-2 text-xs">
+            <div className="p-2 bg-[#0a0e1a] rounded-lg">
+              <div className="text-[#94a3b8] mb-1">Formula: <span className="font-mono text-white">Win% bonus = (Star Morale – 50) ÷ 1000</span></div>
+              <div className="text-[#94a3b8]">Your star morale ended at <span className="text-white font-bold">{state.starMorale}/100</span></div>
+              <div className="mt-1" style={{ color: moraleBonus >= 0 ? '#10b981' : '#ef4444' }}>
+                → Win% adjusted by <strong>{moraleBonus >= 0 ? '+' : ''}{(moraleBonus * 100).toFixed(1)}%</strong> = approximately <strong>{moraleBonus >= 0 ? '+' : ''}{moraleWinAdj} wins</strong> over a full season
+              </div>
+            </div>
+            <div className="text-[#64748b]">High star morale means better effort, fewer missed games, and a positive locker room. Low morale does the reverse — even if the player stays.</div>
+          </div>
+        )}
+      </div>
+
+      {/* Luxury tax score penalty */}
+      {scores.taxBill > 0 && (
+        <div className="p-4 bg-amber-900/10 rounded-xl border border-amber-700/40 mb-4">
+          <div className="text-xs text-amber-400 font-bold mb-2">⚠️ Luxury Tax Cost</div>
+          <div className="text-sm text-[#e2e8f0] mb-1">You were <strong>{formatMoneyShort(scores.taxBill)}</strong> over the luxury tax line.</div>
+          <div className="text-xs text-[#94a3b8] mb-2">The league charges $1.50 for every $1 over → total penalty: <strong className="text-amber-400">{formatMoneyShort(scores.taxBill * 1.5)}</strong>/yr owed to revenue sharing.</div>
+          <div className="text-xs text-amber-400">This cost <strong>{taxPenaltyPoints} points</strong> off your cap health score.</div>
+        </div>
+      )}
+
       {state.scenario && (
         <div className="p-5 bg-[#111827] rounded-xl border border-[#1e293b] mb-6">
           <div className="text-xs text-[#f59e0b] font-bold mb-3">📰 What the Real GM Did</div>
@@ -642,7 +852,7 @@ export default function DumpsterFirePage() {
         </div>
       )}
 
-      <button onClick={() => setPhase('select')} className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl">
+      <button onClick={() => { setPhase('select'); setSelectedScenarioPreview(null); }} className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl">
         TRY ANOTHER SCENARIO
       </button>
     </div>

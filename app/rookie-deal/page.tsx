@@ -97,12 +97,45 @@ function StatBar({ label, value, max, color = '#f59e0b' }: { label: string; valu
   );
 }
 
+// ─── Agent Options ────────────────────────────────────────────────────────────
+
+const AGENT_OPTIONS = [
+  {
+    id: 'standard',
+    name: 'William Morris Endeavor',
+    feePct: 4,
+    brandBonus: 0,
+    desc: 'Industry standard 4% fee. Broad sports network, no surprises. Most NBA players use this tier.',
+    proNote: '~70% of top picks use a standard-fee agency. Safe, reliable.',
+  },
+  {
+    id: 'budget',
+    name: 'Next Level Sports (Boutique)',
+    feePct: 3,
+    brandBonus: 0,
+    desc: '3% fee — lowest rate available. Smaller team, less leverage, but you keep more of every dollar.',
+    proNote: 'Kawhi Leonard used a boutique agency. Saves millions over a career.',
+  },
+  {
+    id: 'premium',
+    name: 'Klutch Sports Group',
+    feePct: 5,
+    brandBonus: 15,
+    desc: '5% fee but elite shoe brand connections. Your guaranteed endorsement value increases by +15%.',
+    proNote: "LeBron's agency. Higher cost, but that +15% shoe bonus can more than offset the extra 1%.",
+  },
+] as const;
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function RookieDealPage() {
   const [phase, setPhase] = useState<Phase>('intro');
   const [gradeRevealed, setGradeRevealed] = useState(false);
   const [devFocus, setDevFocus] = useState<DevFocus>(null);
+  const [agentChoice, setAgentChoice] = useState<typeof AGENT_OPTIONS[number] | null>(null);
+  const [draftSubStep, setDraftSubStep] = useState(0);
+  const [extensionSubStep, setExtensionSubStep] = useState(0);
+  const [showPerfFormula, setShowPerfFormula] = useState(false);
   const [career, setCareer] = useState<CareerState>({
     pickSlot: null,
     profile: null,
@@ -131,10 +164,13 @@ export default function RookieDealPage() {
   // ── Stage 2: Shoe Deal ────────────────────────────────────────────────────
 
   function selectShoeDeal(shoe: ShoeDeal) {
+    // Premium agent adds 15% to endorsement guaranteed value
+    const bonusMultiplier = agentChoice?.id === 'premium' ? 1.15 : 1;
+    const adjustedGuaranteed = shoe.guaranteedValue * bonusMultiplier;
     setCareer(c => ({
       ...c,
       shoeDeal: shoe,
-      totalEarnings: c.totalEarnings + shoe.guaranteedValue,
+      totalEarnings: c.totalEarnings + adjustedGuaranteed,
       brandValue: shoe.brandMultiplier * 20,
     }));
     setPhase('dev-focus');
@@ -192,10 +228,9 @@ export default function RookieDealPage() {
     const shoe = career.shoeDeal;
     const y3 = career.year3Stats;
 
-    // Bonus shoe earnings if All-Star tier
-    const shoeBonus = y3.tier === 'elite'
-      ? shoe.guaranteedValue * (shoe.upsidePct / 100)
-      : 0;
+    // Progressive shoe bonus by performance tier
+    const shoeBonusPct = y3.tier === 'elite' ? 1.0 : y3.tier === 'good' ? 0.5 : 0.25;
+    const shoeBonus = shoe.guaranteedValue * (shoe.upsidePct / 100) * shoeBonusPct;
 
     // Legacy: rings guess based on extension choice
     const rings = ext.id === 'supermax' ? 2
@@ -245,6 +280,10 @@ export default function RookieDealPage() {
     setPhase('intro');
     setGradeRevealed(false);
     setDevFocus(null);
+    setAgentChoice(null);
+    setDraftSubStep(0);
+    setExtensionSubStep(0);
+    setShowPerfFormula(false);
     setCareer({
       pickSlot: null, profile: null, shoeDeal: null, year3Stats: null,
       extensionChoice: null, totalEarnings: 0, brandValue: 0, rings: 0, legacyScore: 50,
@@ -313,90 +352,159 @@ export default function RookieDealPage() {
         {phase === 'draft-night' && (
           <div>
             <PhaseHeader step={0} label="Draft Night" />
-            <div className="mb-6">
-              <h2 className="text-2xl font-black text-white mb-2">Who's Your Client?</h2>
-              <p className="text-[#94a3b8] text-sm">
-                Choose a player profile and pick slot. Higher picks = bigger rookie scale salary (set by the CBA — you can't negotiate this part). But personality, position, and potential all matter for what comes next.
-              </p>
-            </div>
 
-            {/* Rookie scale reference */}
-            <div className="mb-6 p-4 bg-[#111827] rounded-xl border border-[#1e293b]">
-              <div className="text-xs text-[#64748b] font-bold uppercase tracking-widest mb-3">2024 Rookie Scale (CBA-Fixed)</div>
-              <div className="grid grid-cols-5 gap-2">
-                {ROOKIE_SCALE.map(slot => (
-                  <div key={slot.pick} className="text-center p-2 bg-[#0a0e1a] rounded-lg">
-                    <div className="text-xs text-[#64748b] mb-1">Pick #{slot.pick}</div>
-                    <div className="text-sm font-bold text-[#f59e0b]">{fmt(slot.year1Salary)}/yr</div>
-                    <div className="text-xs text-[#64748b]">{fmt(slot.totalGuaranteed)} total</div>
+            {/* SUB-STEP 0: CBA Rules + Agent Selection */}
+            {draftSubStep === 0 && (
+              <div>
+                <h2 className="text-2xl font-black text-white mb-2">Before You Pick: The Rules & Your Team</h2>
+                <p className="text-[#94a3b8] text-sm mb-6">Every top pick needs to understand what the CBA locks in — and who they trust to negotiate everything else.</p>
+
+                {/* CBA Explanation */}
+                <div className="mb-6 p-5 bg-[#0a1520] border border-[#3b82f6]/40 rounded-xl">
+                  <div className="text-xs text-[#3b82f6] font-bold uppercase tracking-widest mb-3">📜 The CBA — What You Can and Can&apos;t Negotiate</div>
+                  <p className="text-[#94a3b8] text-sm mb-4 leading-relaxed">
+                    The <strong className="text-white">Collective Bargaining Agreement (CBA)</strong> is a legally binding contract between the NBA and the Players&apos; Union. It <strong className="text-white">FIXES rookie salaries by draft slot</strong> — no player can negotiate more or less than this table. It&apos;s the same for every team.
+                  </p>
+                  <div className="grid grid-cols-5 gap-2 mb-4">
+                    {ROOKIE_SCALE.map(slot => (
+                      <div key={slot.pick} className="text-center p-2 bg-[#111827] rounded-lg">
+                        <div className="text-xs text-[#64748b] mb-1">Pick #{slot.pick}</div>
+                        <div className="text-sm font-bold text-[#f59e0b]">{fmt(slot.year1Salary)}/yr</div>
+                        <div className="text-xs text-[#64748b]">{fmt(slot.totalGuaranteed)} total</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                  <div className="text-xs text-[#64748b] p-2 bg-[#0a0e1a] rounded-lg">
+                    ⚠️ What you <strong className="text-white">cannot</strong> negotiate: base rookie salary. What you <strong className="text-white">can</strong> negotiate: shoe deals, training camps, endorsements, and extension timing.
+                  </div>
+                </div>
+
+                {/* Agent Selection */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-black text-white mb-2">Choose Your Agent</h3>
+                  <p className="text-[#94a3b8] text-sm mb-4">
+                    Your agent negotiates every deal and takes a % of <em>everything</em> you earn — rookie scale, shoe deals, extensions, endorsements. A higher-fee agent can still make you more money if their connections open bigger deals.
+                  </p>
+                  <div className="space-y-3">
+                    {AGENT_OPTIONS.map(agent => (
+                      <button
+                        key={agent.id}
+                        onClick={() => setAgentChoice(agent)}
+                        className={`w-full text-left p-4 rounded-xl border transition-all ${agentChoice?.id === agent.id ? 'border-[#f59e0b] bg-[#2a1f00]' : 'border-[#1e293b] bg-[#111827] hover:border-[#64748b]'}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="font-bold text-white mb-0.5">{agent.name}</div>
+                            <div className="text-xs text-[#94a3b8]">{agent.desc}</div>
+                            <div className="text-xs text-[#64748b] italic mt-1">{agent.proNote}</div>
+                            {agent.brandBonus > 0 && (
+                              <div className="text-xs text-[#f59e0b] mt-1">✦ +{agent.brandBonus}% to all endorsement guaranteed values</div>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-2xl font-black" style={{ color: agent.feePct <= 3 ? '#10b981' : agent.feePct >= 5 ? '#f59e0b' : '#94a3b8' }}>
+                              {agent.feePct}%
+                            </div>
+                            <div className="text-xs text-[#64748b]">agent cut</div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setDraftSubStep(1)}
+                  disabled={!agentChoice}
+                  className="w-full py-4 bg-[#f59e0b] text-black font-black rounded-xl text-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#d97706] transition-colors"
+                >
+                  {agentChoice ? `Lock in ${agentChoice.name} → Choose Your Client` : 'Select an Agent First'}
+                </button>
               </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {PLAYER_PROFILES.map((profile, i) => {
-                const pick = i + 1;
-                const scale = ROOKIE_SCALE[i];
-                return (
-                  <button
-                    key={profile.id}
-                    onClick={() => selectPick(pick, profile)}
-                    className="text-left p-5 bg-[#1a2035] rounded-xl border border-[#1e293b] hover:border-[#f59e0b]/50 transition-all hover:scale-[1.01] group"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs px-2 py-0.5 bg-[#f59e0b]/20 text-[#f59e0b] border border-[#f59e0b]/30 rounded-full font-bold">
-                            #{pick} Pick
-                          </span>
-                          <span className="text-xs px-2 py-0.5 bg-[#1e293b] text-[#64748b] rounded-full">{profile.position}</span>
+            {/* SUB-STEP 1: Player Selection */}
+            {draftSubStep === 1 && (
+              <div>
+                <div className="mb-4 flex items-center gap-2">
+                  <span className="text-xs px-2 py-1 bg-[#f59e0b]/20 text-[#f59e0b] border border-[#f59e0b]/30 rounded-full">
+                    Agent: {agentChoice?.name} · {agentChoice?.feePct}% fee
+                    {agentChoice?.brandBonus ? ` · +${agentChoice.brandBonus}% brand bonus` : ''}
+                  </span>
+                </div>
+
+                <div className="mb-6">
+                  <h2 className="text-2xl font-black text-white mb-2">Who&apos;s Your Client?</h2>
+                  <p className="text-[#94a3b8] text-sm">
+                    Choose a player profile. Salary is CBA-fixed by pick slot — but personality, position, and star potential shape everything that comes after.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {PLAYER_PROFILES.map((profile, i) => {
+                    const pick = i + 1;
+                    const scale = ROOKIE_SCALE[i];
+                    return (
+                      <button
+                        key={profile.id}
+                        onClick={() => selectPick(pick, profile)}
+                        className="text-left p-5 bg-[#1a2035] rounded-xl border border-[#1e293b] hover:border-[#f59e0b]/50 transition-all hover:scale-[1.01] group"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs px-2 py-0.5 bg-[#f59e0b]/20 text-[#f59e0b] border border-[#f59e0b]/30 rounded-full font-bold">
+                                #{pick} Pick
+                              </span>
+                              <span className="text-xs px-2 py-0.5 bg-[#1e293b] text-[#64748b] rounded-full">{profile.position}</span>
+                            </div>
+                            <h3 className="text-lg font-black text-white group-hover:text-[#f59e0b] transition-colors">{profile.name}</h3>
+                            <div className="text-xs text-[#64748b]">{profile.college} · Age {profile.age}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-bold text-[#10b981]">{fmt(scale.year1Salary)}/yr</div>
+                            <div className="text-xs text-[#64748b]">{fmt(scale.totalGuaranteed)} guaranteed</div>
+                          </div>
                         </div>
-                        <h3 className="text-lg font-black text-white group-hover:text-[#f59e0b] transition-colors">{profile.name}</h3>
-                        <div className="text-xs text-[#64748b]">{profile.college} · Age {profile.age}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-[#10b981]">{fmt(scale.year1Salary)}/yr</div>
-                        <div className="text-xs text-[#64748b]">{fmt(scale.totalGuaranteed)} guaranteed</div>
-                      </div>
-                    </div>
 
-                    <p className="text-xs text-[#94a3b8] mb-3 leading-relaxed">{profile.description}</p>
+                        <p className="text-xs text-[#94a3b8] mb-3 leading-relaxed">{profile.description}</p>
 
-                    <div className="grid grid-cols-4 gap-1 mb-3 text-center">
-                      {[
-                        { label: 'PPG', val: profile.baseStats.ppg },
-                        { label: 'RPG', val: profile.baseStats.rpg },
-                        { label: 'APG', val: profile.baseStats.apg },
-                        { label: 'FG%', val: profile.baseStats.fg },
-                      ].map(s => (
-                        <div key={s.label} className="bg-[#0a0e1a] rounded-lg p-1.5">
-                          <div className="text-sm font-bold text-white">{s.val}</div>
-                          <div className="text-xs text-[#64748b]">{s.label}</div>
+                        <div className="grid grid-cols-4 gap-1 mb-3 text-center">
+                          {[
+                            { label: 'PPG', val: profile.baseStats.ppg },
+                            { label: 'RPG', val: profile.baseStats.rpg },
+                            { label: 'APG', val: profile.baseStats.apg },
+                            { label: 'FG%', val: profile.baseStats.fg },
+                          ].map(s => (
+                            <div key={s.label} className="bg-[#0a0e1a] rounded-lg p-1.5">
+                              <div className="text-sm font-bold text-white">{s.val}</div>
+                              <div className="text-xs text-[#64748b]">{s.label}</div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
 
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <div className="text-xs text-[#64748b] mb-1">Star Potential</div>
-                        <div className="h-1.5 bg-[#1e293b] rounded-full overflow-hidden">
-                          <div className="h-full bg-[#8b5cf6] rounded-full" style={{ width: `${profile.starPotential}%` }} />
+                        <div className="flex gap-3">
+                          <div className="flex-1">
+                            <div className="text-xs text-[#64748b] mb-1">Star Potential</div>
+                            <div className="h-1.5 bg-[#1e293b] rounded-full overflow-hidden">
+                              <div className="h-full bg-[#8b5cf6] rounded-full" style={{ width: `${profile.starPotential}%` }} />
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-xs text-[#64748b] mb-1">Variance (Risk)</div>
+                            <div className="h-1.5 bg-[#1e293b] rounded-full overflow-hidden">
+                              <div className="h-full bg-[#ef4444] rounded-full" style={{ width: `${(profile.variance / 20) * 100}%` }} />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs text-[#64748b] mb-1">Variance (Risk)</div>
-                        <div className="h-1.5 bg-[#1e293b] rounded-full overflow-hidden">
-                          <div className="h-full bg-[#ef4444] rounded-full" style={{ width: `${(profile.variance / 20) * 100}%` }} />
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="mt-3 text-xs text-[#64748b] italic">{profile.realWorldComparison}</div>
-                  </button>
-                );
-              })}
-            </div>
+                        <div className="mt-3 text-xs text-[#64748b] italic">{profile.realWorldComparison}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -418,52 +526,92 @@ export default function RookieDealPage() {
               </p>
             </div>
 
+            {/* Brand trajectory context */}
+            <div className="mb-6 p-4 bg-[#111827] rounded-xl border border-[#1e293b]">
+              <div className="text-xs text-[#64748b] font-bold uppercase tracking-widest mb-2">📈 Brand Trajectory — Where Each Company Is Headed</div>
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                {[
+                  { brand: 'Nike', trajectory: 'Stable global giant. 38% of NBA market. Max instant credibility, but you\'re one of thousands.', color: '#f59e0b' },
+                  { brand: 'Adidas', trajectory: 'Growing globally via soccer→basketball crossover. High upside bonuses in Europe and Asia markets.', color: '#3b82f6' },
+                  { brand: 'New Balance', trajectory: 'Underdog explosion. Kawhi Leonard\'s deal grew 400%. More creative freedom. Highest % bonus if you star.', color: '#10b981' },
+                ].map(b => (
+                  <div key={b.brand} className="p-2 bg-[#0a0e1a] rounded-lg">
+                    <div className="font-bold mb-1" style={{ color: b.color }}>{b.brand}</div>
+                    <div className="text-[#94a3b8] leading-relaxed">{b.trajectory}</div>
+                  </div>
+                ))}
+              </div>
+              {agentChoice?.id === 'premium' && (
+                <div className="mt-3 text-xs text-[#f59e0b] p-2 bg-[#f59e0b]/10 rounded-lg">
+                  ✦ Klutch Sports bonus active: guaranteed value on any shoe deal will be +15% above listed price.
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {SHOE_DEALS.map(shoe => (
-                <button
-                  key={shoe.id}
-                  onClick={() => selectShoeDeal(shoe)}
-                  className="text-left p-5 bg-[#1a2035] rounded-xl border border-[#1e293b] hover:border-[#f59e0b]/50 transition-all hover:scale-[1.01] group"
-                >
-                  <div className="text-4xl font-black mb-3" style={{ color: shoe.id === 'nike' ? '#f59e0b' : shoe.id === 'adidas' ? '#3b82f6' : '#10b981' }}>
-                    {shoe.icon}
-                  </div>
-                  <h3 className="text-lg font-black text-white group-hover:text-[#f59e0b] transition-colors mb-1">{shoe.brand}</h3>
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-[#64748b]">Guaranteed</span>
-                      <span className="font-bold text-[#10b981]">{fmt(shoe.guaranteedValue)}</span>
+              {SHOE_DEALS.map(shoe => {
+                const bonusMultiplier = agentChoice?.id === 'premium' ? 1.15 : 1;
+                const displayGuaranteed = shoe.guaranteedValue * bonusMultiplier;
+                return (
+                  <button
+                    key={shoe.id}
+                    onClick={() => selectShoeDeal(shoe)}
+                    className="text-left p-5 bg-[#1a2035] rounded-xl border border-[#1e293b] hover:border-[#f59e0b]/50 transition-all hover:scale-[1.01] group"
+                  >
+                    <div className="text-4xl font-black mb-3" style={{ color: shoe.id === 'nike' ? '#f59e0b' : shoe.id === 'adidas' ? '#3b82f6' : '#10b981' }}>
+                      {shoe.icon}
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-[#64748b]">Per Year</span>
-                      <span className="font-bold text-white">{fmt(shoe.annualValue)}/yr</span>
+                    <h3 className="text-lg font-black text-white group-hover:text-[#f59e0b] transition-colors mb-1">{shoe.brand}</h3>
+
+                    <div className="space-y-2 mb-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[#64748b]">Guaranteed</span>
+                        <span className="font-bold text-[#10b981]">
+                          {fmt(displayGuaranteed)}
+                          {bonusMultiplier > 1 && <span className="text-xs text-[#f59e0b] ml-1">(+15% agent)</span>}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[#64748b]">Per Year</span>
+                        <span className="font-bold text-white">{fmt(shoe.annualValue)}/yr</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[#64748b]">Performance Bonus</span>
+                        <span className="font-bold text-[#f59e0b]">+{shoe.upsidePct}% (scaled by tier)</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-[#64748b]">All-Star Bonus</span>
-                      <span className="font-bold text-[#f59e0b]">+{shoe.upsidePct}%</span>
+
+                    {/* Tier bonus breakdown */}
+                    <div className="mb-3 p-2 bg-[#0a0e1a] rounded-lg">
+                      <div className="text-xs text-[#64748b] mb-1.5">Performance bonus by tier:</div>
+                      {[
+                        { label: '🌟 Elite (All-Star)', pct: 1.0 },
+                        { label: '✅ Good (Starter)', pct: 0.5 },
+                        { label: '⚠️ Average', pct: 0.25 },
+                      ].map(({ label, pct }) => (
+                        <div key={label} className="flex justify-between text-xs mb-0.5">
+                          <span className="text-[#64748b]">{label}</span>
+                          <span className="text-[#f59e0b]">+{fmt(displayGuaranteed * (shoe.upsidePct / 100) * pct)}</span>
+                        </div>
+                      ))}
                     </div>
-                  </div>
 
-                  <div className="mb-3">
-                    <StatBar
-                      label="Brand Power"
-                      value={shoe.brandMultiplier * 20}
-                      max={40}
-                      color={shoe.id === 'nike' ? '#f59e0b' : shoe.id === 'adidas' ? '#3b82f6' : '#10b981'}
-                    />
-                  </div>
+                    <div className="mb-3">
+                      <StatBar
+                        label="Brand Power"
+                        value={shoe.brandMultiplier * 20}
+                        max={40}
+                        color={shoe.id === 'nike' ? '#f59e0b' : shoe.id === 'adidas' ? '#3b82f6' : '#10b981'}
+                      />
+                    </div>
 
-                  <div className="p-2 bg-[#0a0e1a] rounded-lg mb-2">
-                    <div className="text-xs text-[#10b981] mb-1">✓ {shoe.proNote}</div>
-                  </div>
-                  <div className="text-xs text-[#64748b]">{shoe.riskNote}</div>
-
-                  <div className="mt-3 text-xs text-[#64748b]">
-                    Signature shoe if you reach {shoe.signatureShoeThreshold}+ star potential
-                  </div>
-                </button>
-              ))}
+                    <div className="p-2 bg-[#0a0e1a] rounded-lg mb-2">
+                      <div className="text-xs text-[#10b981] mb-1">✓ {shoe.proNote}</div>
+                    </div>
+                    <div className="text-xs text-[#64748b]">{shoe.riskNote}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -595,6 +743,8 @@ export default function RookieDealPage() {
                     {year3Stats.tier === 'elite' ? '🌟 All-Star Caliber Season' : year3Stats.tier === 'good' ? '✅ Solid Starting-Level Performance' : '⚠️ Below Expectations'}
                   </div>
                   <div className="text-xs text-[#94a3b8]">
+                    Performance score: <strong style={{ color: year3Stats.tier === 'elite' ? '#10b981' : year3Stats.tier === 'good' ? '#f59e0b' : '#ef4444' }}>{year3Stats.performanceScore}/100</strong>
+                    {' — '}
                     {year3Stats.tier === 'elite'
                       ? 'Your client has exceeded all projections. The best extension offers are now available.'
                       : year3Stats.tier === 'good'
@@ -603,6 +753,46 @@ export default function RookieDealPage() {
                   </div>
                 </div>
               )}
+
+              {/* Performance score formula tooltip */}
+              <div className="mt-4 border-t border-[#1e293b] pt-3">
+                <button
+                  onClick={() => setShowPerfFormula(!showPerfFormula)}
+                  className="flex items-center gap-2 text-xs text-[#64748b] hover:text-white transition-colors"
+                >
+                  <span>{showPerfFormula ? '▲' : '▼'}</span>
+                  <span>How is the performance score calculated?</span>
+                </button>
+                {showPerfFormula && year3Stats && (
+                  <div className="mt-3 p-3 bg-[#0a0e1a] rounded-lg space-y-2 text-xs">
+                    <div className="font-mono text-[#94a3b8] mb-2">
+                      Score = (PPG÷35)×40% + (RPG÷12)×15% + (APG÷12)×15% + (FG%÷65)×15% + Potential×15%
+                    </div>
+                    {[
+                      { component: `PPG: ${year3Stats.ppg} ÷ 35`, weight: 40, contribution: Math.round((year3Stats.ppg / 35) * 40), note: 'Scoring has highest weight — most visible NBA skill (league avg: 10 PPG)' },
+                      { component: `RPG: ${year3Stats.rpg} ÷ 12`, weight: 15, contribution: Math.round((year3Stats.rpg / 12) * 15), note: 'Rebounding shows physicality' },
+                      { component: `APG: ${year3Stats.apg} ÷ 12`, weight: 15, contribution: Math.round((year3Stats.apg / 12) * 15), note: 'Assists = court vision' },
+                      { component: `FG%: ${year3Stats.fg} ÷ 65`, weight: 15, contribution: Math.round((year3Stats.fg / 65) * 15), note: '65% is elite efficiency (Bam Adebayo tier)' },
+                      { component: 'Star Potential', weight: 15, contribution: Math.round((career.profile?.starPotential ?? 0) / 100 * 15), note: 'Scouts rate upside, not just current output' },
+                    ].map(({ component, weight, contribution, note }) => (
+                      <div key={component} className="flex items-start gap-3">
+                        <div className="w-24 text-[#f59e0b] font-mono flex-shrink-0">{component}</div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#64748b]">×{weight}% =</span>
+                            <span className="text-white font-bold">{contribution} pts</span>
+                          </div>
+                          <div className="text-[#64748b] italic">{note}</div>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="border-t border-[#1e293b] pt-2 flex justify-between">
+                      <span className="text-[#64748b]">Total</span>
+                      <span className="text-white font-black">{year3Stats.performanceScore}/100</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="text-center">
@@ -620,58 +810,138 @@ export default function RookieDealPage() {
         {phase === 'extension' && career.profile && career.year3Stats && (
           <div>
             <PhaseHeader step={4} label="Extension or Free Agency?" />
-            <div className="mb-6">
-              <h2 className="text-2xl font-black text-white mb-2">The Big Decision</h2>
-              <p className="text-[#94a3b8] text-sm mb-2">
-                Your current team wants to lock you up. But do you take the guaranteed money now, or bet on yourself in free agency next summer? This is the decision that defines careers.
-              </p>
-              <div className="text-xs text-[#64748b] p-3 bg-[#111827] rounded-lg border border-[#1e293b]">
-                📊 Year 3 Performance: <span className="font-bold" style={{
-                  color: career.year3Stats.tier === 'elite' ? '#10b981' : career.year3Stats.tier === 'good' ? '#f59e0b' : '#ef4444',
-                }}>
-                  {career.year3Stats.tier === 'elite' ? 'Elite (All-Star)' : career.year3Stats.tier === 'good' ? 'Good (Starter)' : 'Average'}
-                </span>
-                {' — '}based on this, here are your realistic options:
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 gap-4">
-              {EXTENSION_OFFERS[career.year3Stats.tier].map(ext => (
+            {/* SUB-STEP 0: What's at stake? */}
+            {extensionSubStep === 0 && (
+              <div>
+                <h2 className="text-2xl font-black text-white mb-2">What&apos;s At Stake?</h2>
+                <p className="text-[#94a3b8] text-sm mb-6">
+                  Before you decide, understand exactly what each path guarantees — and risks. This decision cannot be undone.
+                </p>
+
+                <div className="mb-4 p-3 bg-[#111827] rounded-xl border border-[#1e293b] text-xs">
+                  📊 Your Year 3 tier: <strong style={{ color: career.year3Stats.tier === 'elite' ? '#10b981' : career.year3Stats.tier === 'good' ? '#f59e0b' : '#ef4444' }}>
+                    {career.year3Stats.tier === 'elite' ? 'Elite — All-Star Caliber' : career.year3Stats.tier === 'good' ? 'Good — Solid Starter' : 'Average — Below Expectations'}
+                  </strong>
+                  {' '}({career.year3Stats.performanceScore}/100 performance score)
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 mb-6">
+                  {/* Extension path */}
+                  <div className="p-5 bg-[#0a2010] border border-[#10b981]/40 rounded-xl">
+                    <div className="text-xs text-[#10b981] font-bold uppercase tracking-widest mb-3">✅ PATH A: Sign the Extension NOW</div>
+                    <div className="text-3xl font-black text-white mb-1">
+                      {fmt(EXTENSION_OFFERS[career.year3Stats.tier][0].totalValue)} guaranteed
+                    </div>
+                    <div className="text-[#94a3b8] text-sm mb-3">
+                      {EXTENSION_OFFERS[career.year3Stats.tier][0].years} years at {fmt(EXTENSION_OFFERS[career.year3Stats.tier][0].annualValue)}/yr — locked in regardless of future performance
+                    </div>
+                    <div className="text-xs text-[#94a3b8] p-3 bg-[#0a0e1a] rounded-lg">
+                      ⚠️ Only your current team can offer the maximum designated player extension (supermax). Once you hit free agency, that door closes permanently.
+                    </div>
+                  </div>
+
+                  {/* FA path */}
+                  <div className="p-5 bg-[#1a0505] border border-[#ef4444]/40 rounded-xl">
+                    <div className="text-xs text-[#ef4444] font-bold uppercase tracking-widest mb-3">🎲 PATH B: Bet on Free Agency</div>
+                    <div className="text-3xl font-black text-white mb-1">
+                      {career.year3Stats.tier === 'elite' ? '$45M–$60M/yr' : career.year3Stats.tier === 'good' ? '$25M–$40M/yr' : '$8M–$15M/yr'}
+                    </div>
+                    <div className="text-[#94a3b8] text-sm mb-3">
+                      Projected open-market range — based on your Year 3 performance
+                    </div>
+                    <div className="text-xs text-[#94a3b8] p-3 bg-[#0a0e1a] rounded-lg">
+                      {career.year3Stats.tier === 'elite'
+                        ? '📈 As an elite performer, FA could match or beat the extension. But injury, off-year, or a weak market can cut your value in half overnight.'
+                        : career.year3Stats.tier === 'good'
+                        ? '⚖️ Good players find offers in FA — but the extension guarantee usually beats the expected FA value over the long run.'
+                        : '📉 Average performers face brutal FA markets. Teams pay max for stars, offer minimum for projects. The extension is almost certainly the safer choice.'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Historical example at this pick slot */}
+                {historicalComp && (
+                  <div className="p-4 bg-[#111827] border border-[#1e293b] rounded-xl mb-6">
+                    <div className="text-xs text-[#f59e0b] font-bold mb-2">📖 Real Player at Pick #{career.pickSlot} — What They Did</div>
+                    <div className="text-sm">
+                      <strong className="text-white">{historicalComp.playerName}:</strong>{' '}
+                      <span className="text-[#94a3b8]">{historicalComp.contractDecision}</span>
+                    </div>
+                    <div className="text-xs text-[#64748b] mt-1">{historicalComp.careerOutcome}</div>
+                    <div className="flex gap-4 mt-2 text-xs">
+                      <span>Career earnings: <strong className="text-[#10b981]">{historicalComp.totalEarnings}</strong></span>
+                      <span>Rings: <strong className="text-[#f59e0b]">{historicalComp.rings}</strong></span>
+                    </div>
+                  </div>
+                )}
+
                 <button
-                  key={ext.id}
-                  onClick={() => selectExtension(ext)}
-                  className="text-left p-5 bg-[#1a2035] rounded-xl border border-[#1e293b] hover:border-[#f59e0b]/50 transition-all group"
+                  onClick={() => setExtensionSubStep(1)}
+                  className="w-full py-4 bg-[#f59e0b] text-black font-black rounded-xl text-lg hover:bg-[#d97706] transition-colors"
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="text-lg font-black text-white group-hover:text-[#f59e0b] transition-colors">{ext.label}</h3>
-                      <div className="text-[#64748b] text-sm">{ext.years} year{ext.years !== 1 ? 's' : ''} · {fmt(ext.totalValue)} total</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xl font-black text-[#10b981]">{fmt(ext.annualValue)}</div>
-                      <div className="text-xs text-[#64748b]">per year</div>
-                    </div>
-                  </div>
-
-                  <p className="text-[#94a3b8] text-sm mb-4">{ext.description}</p>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <div className="text-xs text-[#10b981] font-bold mb-2">PROS</div>
-                      {ext.pros.map(p => (
-                        <div key={p} className="text-xs text-[#94a3b8] mb-1">✓ {p}</div>
-                      ))}
-                    </div>
-                    <div>
-                      <div className="text-xs text-[#ef4444] font-bold mb-2">CONS</div>
-                      {ext.cons.map(c => (
-                        <div key={c} className="text-xs text-[#94a3b8] mb-1">✗ {c}</div>
-                      ))}
-                    </div>
-                  </div>
+                  See Your Actual Offers →
                 </button>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {/* SUB-STEP 1: Actual extension offers */}
+            {extensionSubStep === 1 && (
+              <div>
+                <div className="mb-6">
+                  <h2 className="text-2xl font-black text-white mb-2">The Big Decision</h2>
+                  <p className="text-[#94a3b8] text-sm mb-2">
+                    Your current team wants to lock you up. Based on your Year 3 performance, these are your real options:
+                  </p>
+                  <div className="text-xs text-[#64748b] p-3 bg-[#111827] rounded-lg border border-[#1e293b]">
+                    📊 Year 3 Performance: <span className="font-bold" style={{
+                      color: career.year3Stats.tier === 'elite' ? '#10b981' : career.year3Stats.tier === 'good' ? '#f59e0b' : '#ef4444',
+                    }}>
+                      {career.year3Stats.tier === 'elite' ? 'Elite (All-Star)' : career.year3Stats.tier === 'good' ? 'Good (Starter)' : 'Average'}
+                    </span>
+                    {' '}· {career.year3Stats.performanceScore}/100 score
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {EXTENSION_OFFERS[career.year3Stats.tier].map(ext => (
+                    <button
+                      key={ext.id}
+                      onClick={() => selectExtension(ext)}
+                      className="text-left p-5 bg-[#1a2035] rounded-xl border border-[#1e293b] hover:border-[#f59e0b]/50 transition-all group"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="text-lg font-black text-white group-hover:text-[#f59e0b] transition-colors">{ext.label}</h3>
+                          <div className="text-[#64748b] text-sm">{ext.years} year{ext.years !== 1 ? 's' : ''} · {fmt(ext.totalValue)} total</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xl font-black text-[#10b981]">{fmt(ext.annualValue)}</div>
+                          <div className="text-xs text-[#64748b]">per year</div>
+                        </div>
+                      </div>
+
+                      <p className="text-[#94a3b8] text-sm mb-4">{ext.description}</p>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-xs text-[#10b981] font-bold mb-2">PROS</div>
+                          {ext.pros.map(p => (
+                            <div key={p} className="text-xs text-[#94a3b8] mb-1">✓ {p}</div>
+                          ))}
+                        </div>
+                        <div>
+                          <div className="text-xs text-[#ef4444] font-bold mb-2">CONS</div>
+                          {ext.cons.map(c => (
+                            <div key={c} className="text-xs text-[#94a3b8] mb-1">✗ {c}</div>
+                          ))}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -702,6 +972,37 @@ export default function RookieDealPage() {
                       <div className="text-7xl font-black mb-2" style={{ color }}>{grade}</div>
                       <div className="text-xl font-bold text-white mb-1">{label}</div>
                       <div className="text-[#64748b] text-sm">Career Score: {finalScore}/100</div>
+                    </div>
+                  );
+                })()}
+
+                {/* Agent fee breakdown */}
+                {(() => {
+                  const feePct = agentChoice?.feePct ?? 4;
+                  const agentFeesPaid = career.totalEarnings * (feePct / 100);
+                  const netEarnings = career.totalEarnings - agentFeesPaid;
+                  return (
+                    <div className="p-4 bg-[#111827] rounded-xl border border-[#1e293b] mb-4">
+                      <div className="text-xs text-[#64748b] font-bold uppercase tracking-widest mb-3">
+                        💼 Agent: {agentChoice?.name ?? 'Standard'} ({feePct}% fee)
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 text-center text-xs">
+                        <div>
+                          <div className="text-lg font-black text-white">{fmt(career.totalEarnings)}</div>
+                          <div className="text-[#64748b]">Gross Earnings</div>
+                        </div>
+                        <div>
+                          <div className="text-lg font-black text-red-400">−{fmt(agentFeesPaid)}</div>
+                          <div className="text-[#64748b]">Agent Fees Paid</div>
+                        </div>
+                        <div>
+                          <div className="text-lg font-black text-[#10b981]">{fmt(netEarnings)}</div>
+                          <div className="text-[#64748b]">Net Earnings</div>
+                        </div>
+                      </div>
+                      {agentChoice?.brandBonus ? (
+                        <div className="mt-2 text-xs text-[#f59e0b] text-center">✦ Premium agent brand bonus was baked into your shoe deal value</div>
+                      ) : null}
                     </div>
                   );
                 })()}

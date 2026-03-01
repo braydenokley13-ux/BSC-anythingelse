@@ -40,6 +40,7 @@ export interface TradeScenario {
   description: string;
   studentTeam: string; // team ID student manages
   goal: string;
+  strategy: { mode: 'win-now' | 'rebuild' | 'mixed'; hint: string };
   teams: TeamSnapshot[];
   historicalOutcome: {
     summary: string;
@@ -58,6 +59,7 @@ export const TRADE_SCENARIOS: TradeScenario[] = [
     description: 'The Lakers missed the playoffs in 2022–23. LeBron and AD are aging. You have few picks. Something has to change.',
     studentTeam: 'lakers',
     goal: 'Acquire a reliable third star or clear cap space for next off-season. Stay competitive for a 37-year-old LeBron.',
+    strategy: { mode: 'win-now', hint: 'LeBron has 1–2 elite years left. Target high-rated players with short contracts — don\'t mortgage picks for rebuilding talent.' },
     teams: [
       {
         id: 'lakers',
@@ -140,6 +142,7 @@ export const TRADE_SCENARIOS: TradeScenario[] = [
     description: 'James Harden demanded a trade. Houston is rebuilding. You\'re Brooklyn — do you give up everything for a 3rd star?',
     studentTeam: 'nets',
     goal: 'Land Harden without destroying your young core. You already have KD and Kyrie.',
+    strategy: { mode: 'win-now', hint: 'KD + Kyrie are at their absolute peak. You need a 3rd star NOW — but don\'t give away every pick or you\'ll have no future if this doesn\'t work.' },
     teams: [
       {
         id: 'nets',
@@ -216,6 +219,7 @@ export const TRADE_SCENARIOS: TradeScenario[] = [
     description: 'Isaiah Thomas was the heart and soul of Boston. Now the Celtics have a chance to get Kyrie Irving — but the price is IT plus picks. Is it worth it?',
     studentTeam: 'celtics',
     goal: 'Land Kyrie without giving up too much future capital. Isaiah Thomas is beloved here — can you get Boston a star without gutting the future?',
+    strategy: { mode: 'mixed', hint: 'Boston is young AND contending. Protect Tatum and Brown at all costs — they\'re untouchable. Trade IT + picks for Kyrie only if salary matches.' },
     teams: [
       {
         id: 'celtics',
@@ -271,6 +275,7 @@ export const TRADE_SCENARIOS: TradeScenario[] = [
     description: 'James Harden wants out of Houston. You\'re the Rockets GM — you MUST trade him. The question is: how much can you squeeze out of his value? Don\'t get low-balled.',
     studentTeam: 'rockets',
     goal: 'Maximize Harden\'s trade return. He has 2 years left and is a top-3 player. Don\'t panic-sell — make teams pay full price.',
+    strategy: { mode: 'rebuild', hint: 'You\'re in full rebuild mode. Refuse salary dumps — demand UNPROTECTED future picks and young players only. Every bad contract you take back hurts your rebuild.' },
     teams: [
       {
         id: 'rockets',
@@ -332,6 +337,7 @@ export const TRADE_SCENARIOS: TradeScenario[] = [
     description: 'Kevin Durant demands out of Brooklyn. You\'re Phoenix — do you mortgage the future for KD?',
     studentTeam: 'suns',
     goal: 'Land KD without crippling Phoenix\'s cap and draft future. You already have Booker and CP3 (expiring).',
+    strategy: { mode: 'win-now', hint: 'KD + Booker = championship window. But KD is 34 — the window is 3 years max. Give picks, but try to hold 1–2 back so you have options when the window closes.' },
     teams: [
       {
         id: 'suns',

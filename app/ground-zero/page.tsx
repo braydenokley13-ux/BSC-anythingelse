@@ -62,7 +62,9 @@ export default function GroundZeroPage() {
   function pickPlayer(player: ExpansionPlayer) {
     if (draftedIds.includes(player.id) || state.draftPicks.length >= PICKS_NEEDED) return;
 
-    const aiChoice = availablePlayers.find(p => !draftedIds.includes(p.id) && p.id !== player.id && !aiRivalPicks.includes(p.id));
+    // AI picks the highest-rated remaining player (smart strategy — prioritizes stars)
+    const remaining = availablePlayers.filter(p => !draftedIds.includes(p.id) && p.id !== player.id && !aiRivalPicks.includes(p.id));
+    const aiChoice = remaining.sort((a, b) => b.rating - a.rating)[0];
     const newAiPicks = aiChoice ? [...aiRivalPicks, aiChoice.id] : aiRivalPicks;
 
     setState(s => ({
@@ -584,6 +586,18 @@ export default function GroundZeroPage() {
     const year2ExpiredSalary = state.rosterFA.reduce((s, p) => s + p.salary, 0);
     const year2CapSpace = Math.max(0, remaningCap + Math.max(0, year2ExpiredSalary - 10));
 
+    // Conference standing context (both cities are Western Conference)
+    const westPlayoffLine = 44;
+    const playIn = finalScore.wins >= 38 && finalScore.wins < westPlayoffLine;
+    const madePlayoffs = finalScore.wins >= westPlayoffLine;
+    const lotteryBound = finalScore.wins < 38;
+    const lotteryOdds = lotteryBound
+      ? finalScore.wins <= 20 ? '14%' : finalScore.wins <= 25 ? '12%' : finalScore.wins <= 30 ? '8%' : '5%'
+      : null;
+    const lotterySlot = lotteryBound
+      ? finalScore.wins <= 20 ? '#1–2' : finalScore.wins <= 25 ? '#3–5' : finalScore.wins <= 30 ? '#5–7' : '#7–10'
+      : null;
+
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-black text-white mb-1">Franchise Verdict</h1>
@@ -610,6 +624,43 @@ export default function GroundZeroPage() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Conference Standing Context */}
+        <div className="p-4 bg-[#111827] rounded-xl border border-[#1e293b] mb-4">
+          <div className="text-xs font-bold text-[#64748b] mb-3 uppercase tracking-widest">📊 Western Conference Standing</div>
+          <div className="flex items-center gap-4 mb-3">
+            <div className="text-center">
+              <div className="text-3xl font-black" style={{ color: madePlayoffs ? '#10b981' : playIn ? '#f59e0b' : '#ef4444' }}>
+                {finalScore.wins}–{82 - finalScore.wins}
+              </div>
+              <div className="text-xs text-[#64748b]">Your Record</div>
+            </div>
+            <div className="flex-1 text-sm">
+              {madePlayoffs && <div className="text-[#10b981] font-bold">✓ Automatic playoff berth — top 6 in the West</div>}
+              {playIn && <div className="text-[#f59e0b] font-bold">⚡ Play-In Tournament (7–10 seed) — one game to make the playoffs</div>}
+              {lotteryBound && <div className="text-[#ef4444] font-bold">📉 Lottery bound — {lotterySlot} pick odds: {lotteryOdds} chance at #1</div>}
+            </div>
+          </div>
+          {/* Mini standings */}
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            {[
+              { label: 'West Playoff Line', wins: 44, desc: 'Top 6 auto qualify' },
+              { label: 'Play-In Line', wins: 38, desc: '7–10 seeds compete' },
+              { label: 'Top Draft Pick', wins: 25, desc: 'Best lottery odds' },
+            ].map(s => (
+              <div key={s.label} className="p-2 bg-[#0a0e1a] rounded-lg">
+                <div className="font-bold text-white">{s.wins} W</div>
+                <div className="text-[#64748b]">{s.label}</div>
+                <div className="text-[#64748b] text-[10px] mt-0.5">{s.desc}</div>
+              </div>
+            ))}
+          </div>
+          {lotteryBound && (
+            <div className="mt-3 p-2 bg-[#ef4444]/10 rounded-lg border border-[#ef4444]/20 text-xs text-[#94a3b8]">
+              <span className="text-[#f59e0b] font-bold">Silver lining:</span> A high lottery pick could land your franchise cornerstone. Year 2 rebuild accelerated.
+            </div>
+          )}
         </div>
 
         {/* Year 2 Cap Projection */}

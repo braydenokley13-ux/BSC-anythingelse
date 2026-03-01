@@ -17,11 +17,14 @@ import {
 
 type Phase =
   | 'intro'
-  | 'draft-night'    // Stage 1: Pick slot revealed
-  | 'shoe-deal'      // Stage 2: Choose shoe brand
-  | 'year3-review'   // Stage 3: Performance revealed, stats shown
-  | 'extension'      // Stage 4: Extension or FA decision
-  | 'outcome';       // Stage 5: Career trajectory + grade
+  | 'draft-night'      // Stage 1: Pick slot revealed
+  | 'shoe-deal'        // Stage 2: Choose shoe brand
+  | 'dev-focus'        // Stage 2.5: Development focus choice (adds stat variance)
+  | 'year3-review'     // Stage 3: Performance revealed, stats shown
+  | 'extension'        // Stage 4: Extension or FA decision
+  | 'outcome';         // Stage 5: Career trajectory + grade
+
+type DevFocus = 'scoring' | 'playmaking' | 'efficiency' | null;
 
 interface CareerState {
   pickSlot: number | null;
@@ -61,7 +64,7 @@ function gradeFromScore(score: number): { grade: string; label: string; color: s
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function PhaseHeader({ step, label }: { step: number; label: string }) {
-  const steps = ['Draft Night', 'Shoe Deal', 'Year 3 Review', 'Extension', 'Outcome'];
+  const steps = ['Draft Night', 'Shoe Deal', 'Dev Focus', 'Year 3', 'Extension', 'Outcome'];
   return (
     <div className="mb-8">
       <div className="flex gap-2 mb-4">
@@ -99,6 +102,7 @@ function StatBar({ label, value, max, color = '#f59e0b' }: { label: string; valu
 export default function RookieDealPage() {
   const [phase, setPhase] = useState<Phase>('intro');
   const [gradeRevealed, setGradeRevealed] = useState(false);
+  const [devFocus, setDevFocus] = useState<DevFocus>(null);
   const [career, setCareer] = useState<CareerState>({
     pickSlot: null,
     profile: null,
@@ -133,6 +137,13 @@ export default function RookieDealPage() {
       totalEarnings: c.totalEarnings + shoe.guaranteedValue,
       brandValue: shoe.brandMultiplier * 20,
     }));
+    setPhase('dev-focus');
+  }
+
+  // ── Stage 2.5: Development Focus ─────────────────────────────────────────
+
+  function selectDevFocus(focus: DevFocus) {
+    setDevFocus(focus);
     setPhase('year3-review');
   }
 
@@ -141,13 +152,21 @@ export default function RookieDealPage() {
   const year3Stats = useMemo(() => {
     if (!career.profile) return null;
     const { baseStats, variance, starPotential } = career.profile;
-    // Deterministic "random" based on profile's inherent traits
     const seed = starPotential / 100;
     const swing = (seed - 0.5) * variance;
-    const ppg = Math.max(5, +(baseStats.ppg + swing).toFixed(1));
-    const rpg = Math.max(1, +(baseStats.rpg + swing * 0.3).toFixed(1));
-    const apg = Math.max(0, +(baseStats.apg + swing * 0.4).toFixed(1));
-    const fg  = Math.min(65, Math.max(35, +(baseStats.fg + swing * 0.2).toFixed(1)));
+
+    // Apply development focus modifiers
+    const focusMods = {
+      scoring:     { ppg: +4, rpg: 0, apg: -1, fg: +1 },
+      playmaking:  { ppg: -1, rpg: 0, apg: +4, fg: +1 },
+      efficiency:  { ppg: 0,  rpg: +2, apg: 0,  fg: +4 },
+    };
+    const mod = devFocus ? focusMods[devFocus] : { ppg: 0, rpg: 0, apg: 0, fg: 0 };
+
+    const ppg = Math.max(5, +(baseStats.ppg + swing + mod.ppg).toFixed(1));
+    const rpg = Math.max(1, +(baseStats.rpg + swing * 0.3 + mod.rpg).toFixed(1));
+    const apg = Math.max(0, +(baseStats.apg + swing * 0.4 + mod.apg).toFixed(1));
+    const fg  = Math.min(65, Math.max(35, +(baseStats.fg + swing * 0.2 + mod.fg).toFixed(1)));
     const score = Math.min(100, Math.round(
       (ppg / 35) * 40 +
       (rpg / 12) * 15 +
@@ -158,7 +177,7 @@ export default function RookieDealPage() {
     const tier: 'elite' | 'good' | 'average' =
       score >= 75 ? 'elite' : score >= 50 ? 'good' : 'average';
     return { ppg, rpg, apg, fg, performanceScore: score, tier };
-  }, [career.profile]);
+  }, [career.profile, devFocus]);
 
   function revealYear3() {
     if (!year3Stats) return;
@@ -225,6 +244,7 @@ export default function RookieDealPage() {
   function reset() {
     setPhase('intro');
     setGradeRevealed(false);
+    setDevFocus(null);
     setCareer({
       pickSlot: null, profile: null, shoeDeal: null, year3Stats: null,
       extensionChoice: null, totalEarnings: 0, brandValue: 0, rings: 0, legacyScore: 50,
@@ -448,15 +468,96 @@ export default function RookieDealPage() {
           </div>
         )}
 
+        {/* ── STAGE 2.5: DEVELOPMENT FOCUS ── */}
+        {phase === 'dev-focus' && career.profile && career.shoeDeal && (
+          <div>
+            <PhaseHeader step={2} label="Development Focus" />
+            <div className="mb-6">
+              <h2 className="text-2xl font-black text-white mb-2">How Does Your Client Develop?</h2>
+              <p className="text-[#94a3b8] text-sm">
+                Years 1–3 of a rookie deal are about development. Your training camp focus shapes what kind of player {career.profile.name} becomes by Year 3. This choice directly affects their stats — and which extension offers open up.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {([
+                {
+                  id: 'scoring' as const,
+                  label: 'Scoring Specialist',
+                  icon: '🏀',
+                  description: 'Live in the mid-range and three-point line. Develop late-clock shot creation and step-back game.',
+                  statChanges: [{ stat: 'PPG', change: '+4' }, { stat: 'APG', change: '−1' }],
+                  proNote: 'Max contract potential if scoring average hits 25+ PPG',
+                  riskNote: 'Ball-dominant = fewer assists, may not help team win percentage',
+                  realExample: 'Bradley Beal focused on scoring — became a top scorer but struggled with team success',
+                },
+                {
+                  id: 'playmaking' as const,
+                  label: 'Playmaker First',
+                  icon: '🎯',
+                  description: 'Elite pick-and-roll operator. Study film. Develop pocket passes and off-ball facilitation.',
+                  statChanges: [{ stat: 'APG', change: '+4' }, { stat: 'PPG', change: '−1' }],
+                  proNote: 'Easier path to All-Star if team wins — votes follow wins',
+                  riskNote: 'Scoring average matters for max contracts — may leave money on table',
+                  realExample: 'Nikola Jokić leaned playmaking — became a 3x MVP. Assists > points.',
+                },
+                {
+                  id: 'efficiency' as const,
+                  label: 'Efficiency & Defense',
+                  icon: '🛡️',
+                  description: 'High-percentage shots only. Paint dominance. Study opponents. Become a two-way anchor.',
+                  statChanges: [{ stat: 'FG%', change: '+4%' }, { stat: 'RPG', change: '+2' }],
+                  proNote: 'Championship teams need efficient defenders — easier path to rings',
+                  riskNote: 'Lower individual numbers = less leverage in contract negotiations',
+                  realExample: 'Kawhi Leonard — defense-first development led to multiple Finals MVPs',
+                },
+              ]).map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => selectDevFocus(opt.id)}
+                  className="text-left p-5 bg-[#1a2035] rounded-xl border border-[#1e293b] hover:border-[#f59e0b]/50 transition-all hover:scale-[1.01] group"
+                >
+                  <div className="text-3xl mb-3">{opt.icon}</div>
+                  <h3 className="text-lg font-black text-white group-hover:text-[#f59e0b] transition-colors mb-2">{opt.label}</h3>
+                  <p className="text-xs text-[#94a3b8] mb-4 leading-relaxed">{opt.description}</p>
+
+                  <div className="flex gap-2 mb-3">
+                    {opt.statChanges.map(s => (
+                      <div key={s.stat} className="px-2 py-1 rounded-full text-xs font-bold" style={{
+                        background: s.change.startsWith('+') ? '#10b98120' : '#ef444420',
+                        color: s.change.startsWith('+') ? '#10b981' : '#ef4444',
+                        border: `1px solid ${s.change.startsWith('+') ? '#10b98150' : '#ef444450'}`,
+                      }}>
+                        {s.stat} {s.change}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-2 bg-[#0a0e1a] rounded-lg mb-2">
+                    <div className="text-xs text-[#10b981] mb-1">✓ {opt.proNote}</div>
+                  </div>
+                  <div className="text-xs text-[#64748b] mb-3">{opt.riskNote}</div>
+                  <div className="text-xs text-[#64748b] italic border-t border-[#1e293b] pt-2">Real: {opt.realExample}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── STAGE 3: YEAR 3 REVIEW ── */}
         {phase === 'year3-review' && career.profile && career.shoeDeal && (
           <div>
-            <PhaseHeader step={2} label="Year 3 Review" />
+            <PhaseHeader step={3} label="Year 3 Review" />
             <div className="mb-6">
               <h2 className="text-2xl font-black text-white mb-2">Year 3 — How Did Your Client Develop?</h2>
               <p className="text-[#94a3b8] text-sm">
                 Three seasons have passed. Your client's Year 3 performance will determine what extension offers are on the table. The numbers don't lie.
               </p>
+              {devFocus && (
+                <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold" style={{ background: '#f59e0b20', color: '#f59e0b', border: '1px solid #f59e0b40' }}>
+                  Development focus: {devFocus === 'scoring' ? '🏀 Scoring Specialist' : devFocus === 'playmaking' ? '🎯 Playmaker First' : '🛡️ Efficiency & Defense'}
+                </div>
+              )}
             </div>
 
             {/* Player card recap */}
@@ -518,7 +619,7 @@ export default function RookieDealPage() {
         {/* ── STAGE 4: EXTENSION ── */}
         {phase === 'extension' && career.profile && career.year3Stats && (
           <div>
-            <PhaseHeader step={3} label="Extension or Free Agency?" />
+            <PhaseHeader step={4} label="Extension or Free Agency?" />
             <div className="mb-6">
               <h2 className="text-2xl font-black text-white mb-2">The Big Decision</h2>
               <p className="text-[#94a3b8] text-sm mb-2">
@@ -577,7 +678,7 @@ export default function RookieDealPage() {
         {/* ── STAGE 5: OUTCOME ── */}
         {phase === 'outcome' && career.profile && career.extensionChoice && career.year3Stats && (
           <div>
-            <PhaseHeader step={4} label="Career Trajectory" />
+            <PhaseHeader step={5} label="Career Trajectory" />
             <h2 className="text-2xl font-black text-white mb-6">Career Summary: {career.profile.name}</h2>
 
             {/* Grade reveal */}
@@ -653,6 +754,38 @@ export default function RookieDealPage() {
                       </div>
                     </div>
                     <div className="mt-3 text-xs text-[#64748b] italic">{career.profile?.realHistoricalNote}</div>
+                  </div>
+                )}
+
+                {/* What-if shoe comparison */}
+                {career.shoeDeal && (
+                  <div className="p-5 bg-[#111827] rounded-xl border border-[#1e293b] mb-6">
+                    <div className="text-xs text-[#64748b] font-bold uppercase tracking-widest mb-3">💡 What If You'd Chosen a Different Shoe Brand?</div>
+                    <div className="grid grid-cols-3 gap-3">
+                      {SHOE_DEALS.map(shoe => {
+                        const isChosen = shoe.id === career.shoeDeal!.id;
+                        const shoeEarnings = shoe.guaranteedValue + (career.year3Stats?.tier === 'elite' ? shoe.guaranteedValue * (shoe.upsidePct / 100) : 0);
+                        const diff = shoeEarnings - (career.shoeDeal!.guaranteedValue + (career.year3Stats?.tier === 'elite' ? career.shoeDeal!.guaranteedValue * (career.shoeDeal!.upsidePct / 100) : 0));
+                        return (
+                          <div key={shoe.id} className={`p-3 rounded-xl border text-center ${isChosen ? 'border-[#f59e0b] bg-[#2a1f00]' : 'border-[#1e293b] bg-[#0a0e1a]'}`}>
+                            <div className="text-xs font-bold mb-1" style={{ color: isChosen ? '#f59e0b' : '#94a3b8' }}>
+                              {shoe.brand} {isChosen ? '✓ Chosen' : ''}
+                            </div>
+                            <div className="text-lg font-black" style={{ color: isChosen ? '#f59e0b' : '#94a3b8' }}>
+                              {fmt(shoeEarnings)}
+                            </div>
+                            {!isChosen && (
+                              <div className="text-xs mt-1" style={{ color: diff > 0 ? '#10b981' : '#ef4444' }}>
+                                {diff > 0 ? '+' : ''}{fmt(diff)} vs your choice
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {career.year3Stats?.tier === 'elite' && (
+                      <div className="text-xs text-[#64748b] mt-2">All-Star performance activates performance bonuses on all deals.</div>
+                    )}
                   </div>
                 )}
 

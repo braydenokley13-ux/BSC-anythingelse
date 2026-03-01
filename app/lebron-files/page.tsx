@@ -48,8 +48,43 @@ export default function LeBronFilesPage() {
   const [selectedEndorsements, setSelectedEndorsements] = useState<string[]>([]);
   const [selectedInvestments, setSelectedInvestments] = useState<string[]>([]);
   const [revealedStep, setRevealedStep] = useState(false);
+  const [consequence, setConsequence] = useState<{ title: string; text: string; stats: { label: string; value: string; color: string }[] } | null>(null);
+  const [pendingPhase, setPendingPhase] = useState<Phase | null>(null);
 
   const isAdvanced = track === '7-8';
+
+  const TEAM_CONSEQUENCES: Record<string, { title: string; text: string; stats: { label: string; value: string; color: string }[] }> = {
+    heat: {
+      title: 'Year 1 — Miami: The Villain Era Begins',
+      text: '"The Decision" caused a national meltdown. Jerseys burned in Cleveland. But in Miami, 20,000 fans packed an arena just for the introductory press conference. LeBron, Wade, and Bosh formed the most hyped team since the '96 Bulls. Year 1 ended in the Finals — a loss to Dallas that still haunts the legacy.',
+      stats: [{ label: 'Season Result', value: 'NBA Finals — Lost to Dallas', color: '#ef4444' }, { label: 'Narrative', value: 'National villain → rings chaser', color: '#f59e0b' }, { label: 'Legacy Impact', value: 'Controversial but winning', color: '#8b5cf6' }],
+    },
+    cavaliers: {
+      title: 'Year 1 — Cleveland: The Loyal King',
+      text: 'The city exhaled. LeBron stayed home — ticket sales surged, city pride was at an all-time high. The roster was thin, but LeBron willed 66 wins out of a team most thought was done. The NBA was on notice: the King wasn\'t going anywhere.',
+      stats: [{ label: 'Season Result', value: '66 wins — Conference Finals', color: '#10b981' }, { label: 'Narrative', value: 'Hometown hero. Legacy cemented', color: '#f59e0b' }, { label: 'Legacy Impact', value: 'Highest loyalty score in league', color: '#10b981' }],
+    },
+    bulls: {
+      title: 'Year 1 — Chicago: Jordan\'s Shadow',
+      text: 'Jordan\'s ghost lurked everywhere in Chicago. LeBron and Derrick Rose formed a dangerous duo — the city was electric. But comparisons to #23 were relentless. After a Conference Finals loss, the question became: is Chicago LeBron\'s city, or will it always belong to Michael?',
+      stats: [{ label: 'Season Result', value: 'Conference Finals exit', color: '#f59e0b' }, { label: 'Narrative', value: 'Legitimate contender but Jordan comparisons everywhere', color: '#f59e0b' }, { label: 'Legacy Impact', value: 'Winning but never his stage', color: '#64748b' }],
+    },
+    knicks: {
+      title: 'Year 1 — New York: The Capital of Basketball',
+      text: 'Madison Square Garden was electric every night — every game was front-page news. But the roster was a disaster. LeBron carried a broken team through sheer will alone. First-round exit. The media pressure was unlike anything — every missed shot dissected for 48 hours.',
+      stats: [{ label: 'Season Result', value: 'First Round exit', color: '#ef4444' }, { label: 'Narrative', value: 'Biggest market, worst supporting cast', color: '#ef4444' }, { label: 'Legacy Impact', value: 'Brand value sky-high, ring count zero', color: '#f59e0b' }],
+    },
+    clippers: {
+      title: 'Year 1 — Los Angeles: The Other LA',
+      text: 'LeBron and Chris Paul dominated the regular season but fell short in the Conference Finals. Being the "other" LA team meant Lakers fans never fully embraced him. The Donald Sterling ownership scandal exploded mid-season — adding chaos to everything.',
+      stats: [{ label: 'Season Result', value: 'Conference Finals exit', color: '#f59e0b' }, { label: 'Narrative', value: 'Winning team, wrong side of town', color: '#64748b' }, { label: 'Legacy Impact', value: 'Competitive but politically messy', color: '#f59e0b' }],
+    },
+    nets: {
+      title: 'Year 1 — New Jersey: Jay-Z\'s Vision Falls Short',
+      text: 'The Barclays Center was brand new, Jay-Z was part of ownership, and the hype was enormous. But the roster wasn\'t good enough. A first-round exit. By mid-season, LeBron was already being questioned. Some "futures" just don\'t pan out the way they look on paper.',
+      stats: [{ label: 'Season Result', value: 'First Round exit', color: '#ef4444' }, { label: 'Narrative', value: 'All hype, no championship hardware', color: '#ef4444' }, { label: 'Legacy Impact', value: 'Questioned immediately', color: '#ef4444' }],
+    },
+  };
 
   function confirmTeamChoice2010() {
     const team = TEAM_OPTIONS_2010.find(t => t.id === selectedTeam);
@@ -68,8 +103,15 @@ export default function LeBronFilesPage() {
       earnings: c.earnings + earnings,
       legacyScore: c.legacyScore + legacyBonus + (rings * 8),
     }));
-    setRevealedStep(false);
-    setPhase('decision-extension');
+    // Show consequence card before advancing
+    const conseq = TEAM_CONSEQUENCES[team.id];
+    if (conseq) {
+      setConsequence(conseq);
+      setPendingPhase('decision-extension');
+    } else {
+      setRevealedStep(false);
+      setPhase('decision-extension');
+    }
   }
 
   function confirmEndorsements() {
@@ -281,13 +323,36 @@ export default function LeBronFilesPage() {
           </div>
         )}
 
-        {selectedTeam && selectedContract && (
+        {selectedTeam && selectedContract && !consequence && (
           <button
             onClick={confirmTeamChoice2010}
             className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl text-lg hover:bg-[#fbbf24] transition-colors"
           >
             LOCK IN DECISION →
           </button>
+        )}
+
+        {/* Consequence reveal card */}
+        {consequence && (
+          <div className="mt-4 p-5 bg-[#111827] rounded-xl border-2 border-[#f59e0b]/60">
+            <div className="text-xs text-[#f59e0b] font-bold uppercase tracking-widest mb-2">📰 What Happened</div>
+            <div className="text-lg font-black text-white mb-3">{consequence.title}</div>
+            <p className="text-[#94a3b8] text-sm leading-relaxed mb-4">{consequence.text}</p>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {consequence.stats.map(s => (
+                <div key={s.label} className="p-2 bg-[#0a0e1a] rounded-lg text-center">
+                  <div className="text-xs font-bold mb-0.5" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-xs text-[#64748b]">{s.label}</div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => { setConsequence(null); setRevealedStep(false); if (pendingPhase) { setPhase(pendingPhase); setPendingPhase(null); } }}
+              className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl hover:bg-[#fbbf24] transition-colors"
+            >
+              CONTINUE — BUILD THE BRAND →
+            </button>
+          </div>
         )}
       </div>
     );
@@ -331,12 +396,18 @@ export default function LeBronFilesPage() {
           {ENDORSEMENT_DEALS.map(deal => {
             const isSelected = selectedEndorsements.includes(deal.id);
             const maxReached = selectedEndorsements.length >= 3 && !isSelected;
+            // Exclusivity conflict: selected deals' exclusivity blocks this deal's category
+            const selectedDeals = ENDORSEMENT_DEALS.filter(d => selectedEndorsements.includes(d.id) && d.id !== deal.id);
+            const conflictingDeal = selectedDeals.find(sel =>
+              sel.exclusivity.some(ex => deal.category.toLowerCase().includes(ex) || deal.exclusivity.includes(ex))
+            );
+            const isBlocked = !isSelected && !!conflictingDeal;
             return (
               <button
                 key={deal.id}
-                onClick={() => !maxReached && setSelectedEndorsements(prev => isSelected ? prev.filter(x => x !== deal.id) : [...prev, deal.id])}
-                disabled={maxReached}
-                className={`text-left p-4 rounded-xl border-2 transition-all disabled:opacity-40 ${isSelected ? 'border-[#f59e0b] bg-[#2a1f00]' : 'border-[#1e293b] bg-[#1a2035] hover:border-[#64748b]'}`}
+                onClick={() => !maxReached && !isBlocked && setSelectedEndorsements(prev => isSelected ? prev.filter(x => x !== deal.id) : [...prev, deal.id])}
+                disabled={maxReached || isBlocked}
+                className={`text-left p-4 rounded-xl border-2 transition-all ${isBlocked ? 'opacity-40 cursor-not-allowed border-[#ef4444]/30 bg-red-950/20' : isSelected ? 'border-[#f59e0b] bg-[#2a1f00]' : 'border-[#1e293b] bg-[#1a2035] hover:border-[#64748b]'} ${maxReached && !isBlocked ? 'disabled:opacity-40' : ''}`}
               >
                 <div className="text-2xl mb-2">{deal.icon}</div>
                 <div className="font-bold text-white text-sm">{deal.brand}</div>
@@ -366,6 +437,11 @@ export default function LeBronFilesPage() {
                   )}
                   {!isAdvanced && deal.exclusivity.length > 0 && (
                     <div className="text-[#64748b] text-xs">Blocks: {deal.exclusivity.join(', ')}</div>
+                  )}
+                  {isBlocked && (
+                    <div className="mt-2 text-xs text-[#ef4444] font-bold">
+                      ✗ Blocked by {conflictingDeal?.brand} (exclusivity conflict)
+                    </div>
                   )}
                 </div>
               </button>

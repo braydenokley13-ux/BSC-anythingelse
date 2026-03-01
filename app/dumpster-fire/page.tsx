@@ -7,7 +7,7 @@ import { calculateLuxuryTax, formatMoneyShort, stretchProvision } from '@/lib/Ca
 import MoraleBar from '@/components/shared/MoraleBar';
 import { HintBox } from '@/components/shared/TrackWrapper';
 
-type Phase = 'select' | 'year1' | 'year2' | 'year3' | 'press-event' | 'verdict';
+type Phase = 'select' | 'year1' | 'year2' | 'year3' | 'press-event' | 'star-crisis' | 'verdict';
 
 interface RebuildState {
   scenario: CapNightmareScenario | null;
@@ -132,6 +132,11 @@ export default function DumpsterFirePage() {
     }));
     setActionLog(prev => [...prev, logEntry]);
     setSelectedTool(null);
+
+    // If star morale hits 0, trigger forced trade demand crisis
+    if (newStarMorale <= 0) {
+      setPhase('star-crisis');
+    }
   }
 
   function signMLE(agentId: string) {
@@ -312,6 +317,55 @@ export default function DumpsterFirePage() {
     );
   }
 
+  // STAR CRISIS — forced when star morale hits 0
+  if (phase === 'star-crisis') {
+    const starPlayer = state.players.find(p => p.moraleImpact >= 3) || state.players[0];
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="text-xs text-[#ef4444] font-bold uppercase tracking-widest mb-4">🔥 FRANCHISE CRISIS</div>
+        <div className="p-6 rounded-xl border-2 border-[#ef4444] bg-red-950/20 mb-6">
+          <div className="text-4xl mb-4">📢</div>
+          <h2 className="text-2xl font-black text-white mb-3">Star Demands Trade — Publicly</h2>
+          <p className="text-[#e2e8f0] text-sm leading-relaxed mb-4">
+            {starPlayer?.name || 'Your franchise star'} held a press conference today and said:{' '}
+            <span className="italic text-[#f59e0b]">"I love this city, but the situation isn't working. I need to be somewhere I can win."</span>{' '}
+            This is now public. You MUST execute a trade to restore any semblance of order.
+          </p>
+          <div className="grid grid-cols-3 gap-3 text-xs mb-4">
+            {[
+              { label: 'Star Morale', value: '0%', color: '#ef4444' },
+              { label: 'Fan Confidence', value: `${Math.max(0, state.fanConfidence - 20)}%`, color: '#ef4444' },
+              { label: 'Locker Room', value: `${Math.max(0, state.lockerRoomMorale - 15)}%`, color: '#f59e0b' },
+            ].map(s => (
+              <div key={s.label} className="p-2 bg-[#0a0e1a] rounded-lg text-center">
+                <div className="text-xl font-black" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-[#64748b]">{s.label}</div>
+              </div>
+            ))}
+          </div>
+          <div className="p-3 bg-[#0a0e1a] rounded-lg text-xs text-[#94a3b8]">
+            📚 <span className="text-[#f59e0b] font-bold">Real example:</span> In 2019, Anthony Davis demanded a trade from the New Orleans Pelicans. The team held firm for months but eventually dealt him to the Lakers. Cap health suffered — but the return package (picks + youth) set up their future.
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setState(s => ({
+              ...s,
+              fanConfidence: Math.max(0, s.fanConfidence - 20),
+              lockerRoomMorale: Math.max(0, s.lockerRoomMorale - 15),
+            }));
+            setActionLog(prev => [...prev, '🔥 CRISIS: Star demanded trade publicly. Morale penalties applied. You must trade them.']);
+            setSelectedTool('trade');
+            setPhase(phase === 'star-crisis' ? (state.decisions.includes('year1') ? 'year2' : 'year1') : 'year1');
+          }}
+          className="w-full py-3 bg-[#ef4444] text-white font-black rounded-xl hover:opacity-90 transition-opacity"
+        >
+          MANAGE THE FALLOUT — TRADE THEM →
+        </button>
+      </div>
+    );
+  }
+
   const currentYear = phase === 'year1' ? 'Year 1' : phase === 'year2' ? 'Year 2' : 'Year 3';
   const taxBill = calculateLuxuryTax(state.totalSalary);
 
@@ -475,6 +529,40 @@ export default function DumpsterFirePage() {
               </div>
             </div>
           )}
+
+          {/* Win trajectory projection */}
+          <div className="bg-[#0a0e1a] rounded-xl border border-[#1e293b] p-3 mb-3">
+            <div className="text-xs text-[#64748b] font-bold mb-2 uppercase tracking-widest">Win Projection</div>
+            <div className="space-y-2">
+              {(['year1', 'year2', 'year3'] as const).map((yr, i) => {
+                const isCurrent = phase === yr;
+                const isPast = ['year1', 'year2', 'year3'].indexOf(phase) > i;
+                const projectedWinPct = state.winPct * (state.isTanking ? 0.5 : 1) - (i > 0 ? 0 : 0);
+                const projWins = Math.round(Math.max(12, Math.min(65, projectedWinPct * 82)));
+                const yr1YearScoreExists = Object.keys(yearScores).length > 0;
+                return (
+                  <div key={yr} className="flex items-center gap-2">
+                    <span className="text-xs text-[#64748b] w-12">Yr {i + 1}</span>
+                    <div className="flex-1 h-1.5 bg-[#1e293b] rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${(projWins / 82) * 100}%`,
+                          background: isCurrent ? '#f59e0b' : isPast ? '#10b981' : '#1e293b',
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs w-12 text-right" style={{ color: isCurrent ? '#f59e0b' : isPast ? '#10b981' : '#64748b' }}>
+                      {isCurrent ? `~${projWins}W` : isPast && yr1YearScoreExists ? `${projWins}W` : '—'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-xs text-[#64748b] mt-2">
+              Playoff line: ~44W · {state.winPct > 0.5 ? '✓ Contending' : state.winPct > 0.35 ? '⚡ Bubble team' : '📉 Lottery'}
+            </div>
+          </div>
 
           {/* Action log */}
           {actionLog.length > 0 && (

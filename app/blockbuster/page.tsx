@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { TRADE_SCENARIOS } from '@/data/tradeScenarios';
-import { evaluateTrade } from '@/lib/AIValuation';
+import { evaluateTrade, calculateMultiFactorScore } from '@/lib/AIValuation';
+import { saveCompletion } from '@/lib/gradeStorage';
+import GradeRevealPrompt from '@/components/shared/GradeRevealPrompt';
 import { isTradeCapLegal, formatMoneyShort } from '@/lib/CapMath';
 import CapSheetPanel from '@/components/BlockbusterSim/CapSheetPanel';
 import ScoreBreakdown from '@/components/shared/ScoreBreakdown';
@@ -536,36 +538,20 @@ export default function BlockbusterPage() {
     const winPctDelta  = ((avgRatingIn - avgRatingOut) / 100) * 0.4;
     const winDelta     = Math.round(winPctDelta * 82);
 
-    // Compute letter grade for localStorage
-    const scoreTotal = finalScore
-      ? Math.round(finalScore.valueAcquired * 4 + finalScore.capEfficiency * 3 + finalScore.futureAssets * 3)
-      : 0;
-    const letterGrade = scoreTotal >= 90 ? 'A+' : scoreTotal >= 85 ? 'A' : scoreTotal >= 75 ? 'B+' : scoreTotal >= 65 ? 'B' : scoreTotal >= 55 ? 'C' : 'D';
+    const letterGrade = finalScore
+      ? calculateMultiFactorScore({ valueAcquired: finalScore.valueAcquired, capEfficiency: finalScore.capEfficiency, futureAssets: finalScore.futureAssets }).grade
+      : 'D';
 
     if (!gradeRevealed) {
       return (
-        <div className="max-w-3xl mx-auto px-4 py-8">
-          <h1 className="text-2xl font-black text-white mb-2">{dealMade ? '🤝 Deal Done' : '🚫 No Deal'}</h1>
-          <p className="text-[#64748b] text-sm mb-6">{scenario.title} — {scenario.year}</p>
-          <div className="text-center py-16">
-            <div className="text-[#64748b] text-sm mb-6">
-              {dealMade ? 'Trade logged. Evaluating GM performance...' : 'Walkaway recorded. Calculating negotiation score...'}
-            </div>
-            <button
-              onClick={() => {
-                setGradeRevealed(true);
-                try {
-                  const prev = JSON.parse(localStorage.getItem('bsc-completed') || '{}');
-                  prev['/blockbuster'] = { completed: true, grade: dealMade ? letterGrade : '—' };
-                  localStorage.setItem('bsc-completed', JSON.stringify(prev));
-                } catch {}
-              }}
-              className="px-10 py-4 bg-[#f59e0b] text-black font-black rounded-xl text-lg hover:bg-[#d97706] transition-colors animate-pulse"
-            >
-              Reveal GM Score
-            </button>
-          </div>
-        </div>
+        <GradeRevealPrompt
+          title={dealMade ? '🤝 Deal Done' : '🚫 No Deal'}
+          subtitle={`${scenario.title} — ${scenario.year}`}
+          loadingMessage={dealMade ? 'Trade logged. Evaluating GM performance...' : 'Walkaway recorded. Calculating negotiation score...'}
+          buttonText="Reveal GM Score"
+          buttonColor="#f59e0b"
+          onReveal={() => { setGradeRevealed(true); saveCompletion('/blockbuster', dealMade ? letterGrade : '—'); }}
+        />
       );
     }
 

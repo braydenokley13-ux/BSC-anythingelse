@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { saveCompletion } from '@/lib/gradeStorage';
+import GradeRevealPrompt from '@/components/shared/GradeRevealPrompt';
 import {
   EXPANSION_PLAYER_POOL, FREE_AGENT_POOL, CITY_PROFILES,
   NBA_SALARY_FLOOR, EXPANSION_CAP_ALLOTMENT
@@ -712,26 +714,14 @@ export default function GroundZeroPage() {
 
     if (!gradeRevealed) {
       return (
-        <div className="max-w-3xl mx-auto px-4 py-8">
-          <h1 className="text-3xl font-black text-white mb-1">Franchise Verdict</h1>
-          <p className="text-[#64748b] text-sm mb-6">{state.city?.name} <span className="text-[#f59e0b]">{state.teamNickname}</span> · Year 1</p>
-          <div className="text-center py-16">
-            <div className="text-[#64748b] text-sm mb-6">Season complete. Tallying wins, cap flexibility, and fan growth...</div>
-            <button
-              onClick={() => {
-                setGradeRevealed(true);
-                try {
-                  const prev = JSON.parse(localStorage.getItem('bsc-completed') || '{}');
-                  prev['/ground-zero'] = { completed: true, grade: outcomeBadge };
-                  localStorage.setItem('bsc-completed', JSON.stringify(prev));
-                } catch {}
-              }}
-              className="px-10 py-4 bg-[#10b981] text-black font-black rounded-xl text-lg hover:bg-[#059669] transition-colors animate-pulse"
-            >
-              Reveal Season Results
-            </button>
-          </div>
-        </div>
+        <GradeRevealPrompt
+          title="Franchise Verdict"
+          subtitle={`${state.city?.name ?? ''} ${state.teamNickname} · Year 1`}
+          loadingMessage="Season complete. Tallying wins, cap flexibility, and fan growth..."
+          buttonText="Reveal Season Results"
+          buttonColor="#10b981"
+          onReveal={() => { setGradeRevealed(true); saveCompletion('/ground-zero', outcomeBadge); }}
+        />
       );
     }
 

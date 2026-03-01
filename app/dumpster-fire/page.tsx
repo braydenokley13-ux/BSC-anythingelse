@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { saveCompletion } from '@/lib/gradeStorage';
+import GradeRevealPrompt from '@/components/shared/GradeRevealPrompt';
 import { CAP_NIGHTMARE_SCENARIOS, REBUILD_TOOLS, MLE_FREE_AGENTS, PRESS_EVENTS } from '@/data/capNightmareTeams';
 import type { CapNightmareScenario, CapPlayer } from '@/data/capNightmareTeams';
 import { calculateLuxuryTax, formatMoneyShort, stretchProvision } from '@/lib/CapMath';
@@ -247,7 +249,7 @@ export default function DumpsterFirePage() {
     setErrorMessage(null);
   }
 
-  function calculateFinalScore() {
+  const finalScores = useMemo(() => {
     const capHealth = Math.max(0, Math.min(100, 100 - (state.totalSalary - 140) * 3));
     const taxBill = calculateLuxuryTax(state.totalSalary);
     const taxScore = taxBill === 0 ? 100 : Math.max(0, 100 - taxBill * 5);
@@ -259,7 +261,7 @@ export default function DumpsterFirePage() {
       futureAssets: Math.min(100, futureAssets),
       taxBill,
     };
-  }
+  }, [state.totalSalary, state.winPct, state.isTanking, state.picks.length]);
 
   if (phase === 'select') {
     // STAGE 2: Detailed situation preview before starting
@@ -773,37 +775,26 @@ export default function DumpsterFirePage() {
   if (phase !== 'verdict') return phaseContent;
 
   // VERDICT
-  const scores = calculateFinalScore();
-  const overall = Math.round((scores.capHealth + scores.competitiveness + scores.futureAssets) / 3);
+  const overall = Math.round((finalScores.capHealth + finalScores.competitiveness + finalScores.futureAssets) / 3);
   const grade = overall >= 80 ? 'A' : overall >= 65 ? 'B' : overall >= 50 ? 'C' : overall >= 35 ? 'D' : 'F';
   const gradeColor = grade === 'A' ? '#10b981' : grade === 'B' ? '#f59e0b' : grade === 'C' ? '#3b82f6' : '#ef4444';
 
   // Morale → Win% formula: winPctBonus = (starMorale - 50) / 1000
   const moraleBonus = (state.starMorale - 50) / 1000;
   const moraleWinAdj = Math.round(moraleBonus * 82 * 10) / 10; // fractional wins
-  const taxPenaltyPoints = scores.taxBill > 0 ? Math.round(scores.taxBill * 5) : 0;
+  const taxPenaltyPoints = finalScores.taxBill > 0 ? Math.round(finalScores.taxBill * 5) : 0;
 
   if (!gradeRevealed) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-black text-white mb-6">3-Year Rebuild Verdict</h1>
-        <div className="text-center py-16">
-          <div className="text-[#64748b] text-sm mb-6">3 years of decisions locked in. Calculating rebuild score...</div>
-          <button
-            onClick={() => {
-              setGradeRevealed(true);
-              try {
-                const prev = JSON.parse(localStorage.getItem('bsc-completed') || '{}');
-                prev['/dumpster-fire'] = { completed: true, grade };
-                localStorage.setItem('bsc-completed', JSON.stringify(prev));
-              } catch {}
-            }}
-            className="px-10 py-4 bg-[#ef4444] text-white font-black rounded-xl text-lg hover:bg-[#dc2626] transition-colors animate-pulse"
-          >
-            Reveal Rebuild Grade
-          </button>
-        </div>
-      </div>
+      <GradeRevealPrompt
+        title="3-Year Rebuild Verdict"
+        subtitle=""
+        loadingMessage="3 years of decisions locked in. Calculating rebuild score..."
+        buttonText="Reveal Rebuild Grade"
+        buttonColor="#ef4444"
+        buttonTextColor="white"
+        onReveal={() => { setGradeRevealed(true); saveCompletion('/dumpster-fire', grade); }}
+      />
     );
   }
 
@@ -819,9 +810,9 @@ export default function DumpsterFirePage() {
 
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { label: 'Cap Health', score: scores.capHealth, desc: 'Did you clear tax space?' },
-          { label: 'Competitiveness', score: scores.competitiveness, desc: 'Win % trajectory' },
-          { label: 'Future Assets', score: scores.futureAssets, desc: 'Picks & young players' },
+          { label: 'Cap Health', score: finalScores.capHealth, desc: 'Did you clear tax space?' },
+          { label: 'Competitiveness', score: finalScores.competitiveness, desc: 'Win % trajectory' },
+          { label: 'Future Assets', score: finalScores.futureAssets, desc: 'Picks & young players' },
         ].map(({ label, score, desc }) => (
           <div key={label} className="bg-[#1a2035] rounded-xl border border-[#1e293b] p-3 text-center">
             <div className="text-2xl font-black" style={{ color: score >= 70 ? '#10b981' : score >= 40 ? '#f59e0b' : '#ef4444' }}>{score}</div>
@@ -855,11 +846,11 @@ export default function DumpsterFirePage() {
       </div>
 
       {/* Luxury tax score penalty */}
-      {scores.taxBill > 0 && (
+      {finalScores.taxBill > 0 && (
         <div className="p-4 bg-amber-900/10 rounded-xl border border-amber-700/40 mb-4">
           <div className="text-xs text-amber-400 font-bold mb-2">⚠️ Luxury Tax Cost</div>
-          <div className="text-sm text-[#e2e8f0] mb-1">You were <strong>{formatMoneyShort(scores.taxBill)}</strong> over the luxury tax line.</div>
-          <div className="text-xs text-[#94a3b8] mb-2">The league charges $1.50 for every $1 over → total penalty: <strong className="text-amber-400">{formatMoneyShort(scores.taxBill * 1.5)}</strong>/yr owed to revenue sharing.</div>
+          <div className="text-sm text-[#e2e8f0] mb-1">You were <strong>{formatMoneyShort(finalScores.taxBill)}</strong> over the luxury tax line.</div>
+          <div className="text-xs text-[#94a3b8] mb-2">The league charges $1.50 for every $1 over → total penalty: <strong className="text-amber-400">{formatMoneyShort(finalScores.taxBill * 1.5)}</strong>/yr owed to revenue sharing.</div>
           <div className="text-xs text-amber-400">This cost <strong>{taxPenaltyPoints} points</strong> off your cap health score.</div>
         </div>
       )}

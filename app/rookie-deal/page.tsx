@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { saveCompletion } from '@/lib/gradeStorage';
 import Link from 'next/link';
 import {
   ROOKIE_SCALE,
@@ -958,12 +959,7 @@ export default function RookieDealPage() {
                 <button
                   onClick={() => {
                     setGradeRevealed(true);
-                    try {
-                      const { grade } = gradeFromScore(finalScore);
-                      const prev = JSON.parse(localStorage.getItem('bsc-completed') || '{}');
-                      prev['/rookie-deal'] = { completed: true, grade };
-                      localStorage.setItem('bsc-completed', JSON.stringify(prev));
-                    } catch {}
+                    saveCompletion('/rookie-deal', gradeFromScore(finalScore).grade);
                   }}
                   className="px-10 py-4 bg-[#f59e0b] text-black font-black rounded-xl text-lg hover:bg-[#d97706] transition-colors animate-pulse"
                 >

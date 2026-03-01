@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { saveCompletion } from '@/lib/gradeStorage';
+import GradeRevealPrompt from '@/components/shared/GradeRevealPrompt';
 import {
   TEAM_OPTIONS_2010, CONTRACT_OPTIONS, ENDORSEMENT_DEALS, INVESTMENT_OPTIONS,
   LEBRON_REAL_TIMELINE, BRONNY_DECISIONS,
@@ -957,26 +959,15 @@ export default function LeBronFilesPage() {
 
     if (!gradeRevealed) {
       return (
-        <div className="max-w-3xl mx-auto px-4 py-8">
-          <h1 className="text-3xl font-black text-white mb-2">LeBron&apos;s Final Story</h1>
-          <p className="text-[#64748b] text-sm mb-8">All decisions locked in. Calculating legacy score...</p>
-          <div className="text-center py-16">
-            <div className="text-[#64748b] text-sm mb-6">20+ years of decisions compiled. Legacy = rings + brand + investments.</div>
-            <button
-              onClick={() => {
-                setGradeRevealed(true);
-                try {
-                  const prev = JSON.parse(localStorage.getItem('bsc-completed') || '{}');
-                  prev['/lebron-files'] = { completed: true, grade: legacyGrade };
-                  localStorage.setItem('bsc-completed', JSON.stringify(prev));
-                } catch {}
-              }}
-              className="px-10 py-4 bg-[#8b5cf6] text-white font-black rounded-xl text-lg hover:bg-[#7c3aed] transition-colors animate-pulse"
-            >
-              Reveal Legacy Score
-            </button>
-          </div>
-        </div>
+        <GradeRevealPrompt
+          title="LeBron's Final Story"
+          subtitle="All decisions locked in. Calculating legacy score..."
+          loadingMessage="20+ years of decisions compiled. Legacy = rings + brand + investments."
+          buttonText="Reveal Legacy Score"
+          buttonColor="#8b5cf6"
+          buttonTextColor="white"
+          onReveal={() => { setGradeRevealed(true); saveCompletion('/lebron-files', legacyGrade); }}
+        />
       );
     }
 

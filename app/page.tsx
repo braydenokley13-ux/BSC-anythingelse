@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { loadCompletions, type SimResult } from '@/lib/gradeStorage';
 
 const MAIN_SIMS = [
   {
@@ -92,13 +93,18 @@ const MINI_GAMES = [
 ];
 
 export default function Home() {
-  const [completed, setCompleted] = useState<Record<string, { completed: boolean; grade: string }>>({});
+  const [completed, setCompleted] = useState<Record<string, SimResult>>({});
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('bsc-completed');
-      if (stored) setCompleted(JSON.parse(stored));
-    } catch {}
+    const refresh = () => setCompleted(loadCompletions());
+    refresh();
+    // Re-read when the user returns to this tab/page after completing a sim
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
   }, []);
 
   return (

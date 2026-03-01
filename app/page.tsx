@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 
 const MAIN_SIMS = [
   {
@@ -89,6 +92,15 @@ const MINI_GAMES = [
 ];
 
 export default function Home() {
+  const [completed, setCompleted] = useState<Record<string, { completed: boolean; grade: string }>>({});
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('bsc-completed');
+      if (stored) setCompleted(JSON.parse(stored));
+    } catch {}
+  }, []);
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
       {/* Hero */}
@@ -117,39 +129,50 @@ export default function Home() {
           MAIN SIMULATIONS — MULTI-STAGE • REAL DATA • AI NEGOTIATION
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          {MAIN_SIMS.map(sim => (
-            <Link
-              key={sim.href}
-              href={sim.href}
-              className="group block p-6 bg-[#1a2035] rounded-2xl border border-[#1e293b] hover:border-[#f59e0b]/50 transition-all hover:scale-[1.01]"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <div className="text-3xl mb-3">{sim.emoji}</div>
-                  <h2 className="text-xl font-black text-white group-hover:text-[#f59e0b] transition-colors">{sim.title}</h2>
-                  <div className="text-[#64748b] text-sm">{sim.subtitle}</div>
-                </div>
-                <span className="text-xs px-2 py-1 rounded-full font-bold" style={{ background: sim.color + '20', color: sim.color, border: `1px solid ${sim.color}50` }}>
-                  {sim.difficulty}
-                </span>
-              </div>
-              <p className="text-[#94a3b8] text-sm leading-relaxed mb-4">{sim.description}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {sim.tags.map(tag => (
-                  <span key={tag} className="text-xs px-2 py-0.5 bg-[#0a0e1a] border border-[#1e293b] rounded-full text-[#64748b]">{tag}</span>
-                ))}
-              </div>
-              <div className="mt-4 flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2" style={{ color: sim.color }}>
-                  <span>Launch Sim</span>
-                  <span className="group-hover:translate-x-1 transition-transform">→</span>
-                </div>
-                {'time' in sim && (
-                  <span className="text-xs text-[#64748b]">⏱ {sim.time}</span>
+          {MAIN_SIMS.map(sim => {
+            const result = completed[sim.href];
+            return (
+              <Link
+                key={sim.href}
+                href={sim.href}
+                className="group block p-6 bg-[#1a2035] rounded-2xl border border-[#1e293b] hover:border-[#f59e0b]/50 transition-all hover:scale-[1.01] relative"
+              >
+                {result?.completed && (
+                  <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2 py-1 bg-[#10b981]/15 border border-[#10b981]/40 rounded-full">
+                    <span className="text-[#10b981] text-xs font-black">✓ Done</span>
+                    {result.grade && result.grade !== '—' && (
+                      <span className="text-[#10b981] text-xs font-bold">{result.grade}</span>
+                    )}
+                  </div>
                 )}
-              </div>
-            </Link>
-          ))}
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <div className="text-3xl mb-3">{sim.emoji}</div>
+                    <h2 className="text-xl font-black text-white group-hover:text-[#f59e0b] transition-colors">{sim.title}</h2>
+                    <div className="text-[#64748b] text-sm">{sim.subtitle}</div>
+                  </div>
+                  <span className="text-xs px-2 py-1 rounded-full font-bold" style={{ background: sim.color + '20', color: sim.color, border: `1px solid ${sim.color}50` }}>
+                    {sim.difficulty}
+                  </span>
+                </div>
+                <p className="text-[#94a3b8] text-sm leading-relaxed mb-4">{sim.description}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {sim.tags.map(tag => (
+                    <span key={tag} className="text-xs px-2 py-0.5 bg-[#0a0e1a] border border-[#1e293b] rounded-full text-[#64748b]">{tag}</span>
+                  ))}
+                </div>
+                <div className="mt-4 flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2" style={{ color: sim.color }}>
+                    <span>{result?.completed ? 'Play Again' : 'Launch Sim'}</span>
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </div>
+                  {'time' in sim && (
+                    <span className="text-xs text-[#64748b]">⏱ {sim.time}</span>
+                  )}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </div>
 

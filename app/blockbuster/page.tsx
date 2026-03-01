@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TRADE_SCENARIOS } from '@/data/tradeScenarios';
 import { evaluateTrade } from '@/lib/AIValuation';
 import { isTradeCapLegal, formatMoneyShort } from '@/lib/CapMath';
@@ -22,6 +22,9 @@ export default function BlockbusterPage() {
   const [negotiationRound, setNegotiationRound] = useState(0);
   const [aiResponse, setAiResponse] = useState<ReturnType<typeof evaluateTrade> | null>(null);
   const [finalScore, setFinalScore] = useState<{ valueAcquired: number; capEfficiency: number; futureAssets: number } | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number>(-1);
+  const [showFormula, setShowFormula] = useState(false);
+  const [gradeRevealed, setGradeRevealed] = useState(false);
 
   const scenario = scenarioId ? TRADE_SCENARIOS.find(s => s.id === scenarioId) : null;
   const studentTeam = scenario?.teams.find(t => t.id === scenario.studentTeam);
@@ -29,6 +32,15 @@ export default function BlockbusterPage() {
   const targetTeam = selectedTargetTeam ? scenario?.teams.find(t => t.id === selectedTargetTeam) : null;
 
   const isAdvanced = track === '7-8';
+
+  // Hard mode: 30-second timer per negotiation round
+  useEffect(() => {
+    if (!isAdvanced || stage !== 'negotiation' || timeLeft === -1) return;
+    if (timeLeft === 0) { acceptDeal(); return; }
+    const id = setInterval(() => setTimeLeft(t => t - 1), 1000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdvanced, stage, timeLeft]);
 
   function toggleOutgoing(id: string) {
     setSelectedOutgoing(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -65,6 +77,7 @@ export default function BlockbusterPage() {
 
     setAiResponse(evaluation);
     setNegotiationRound(r => r + 1);
+    if (isAdvanced) setTimeLeft(30);
     setStage('negotiation');
   }
 
@@ -100,6 +113,9 @@ export default function BlockbusterPage() {
     setNegotiationRound(0);
     setAiResponse(null);
     setFinalScore(null);
+    setTimeLeft(-1);
+    setShowFormula(false);
+    setGradeRevealed(false);
   }
 
   // ── STAGE: SELECT SCENARIO ──────────────────────────────────────────────────
@@ -173,9 +189,31 @@ export default function BlockbusterPage() {
               <div className="text-xs text-[#64748b] uppercase tracking-widest mb-2">Situation</div>
               <p className="text-[#e2e8f0] text-sm leading-relaxed">{scenario.description}</p>
             </div>
-            <div className="p-4 bg-[#2a1f00] rounded-xl border border-[#f59e0b]/30">
+            <div className="p-4 bg-[#2a1f00] rounded-xl border border-[#f59e0b]/30 mb-4">
               <div className="text-xs text-[#f59e0b] font-bold uppercase tracking-widest mb-2">🎯 Your Mission</div>
               <p className="text-[#e2e8f0] text-sm">{scenario.goal}</p>
+            </div>
+            {/* Strategy context */}
+            <div className={`p-4 rounded-xl border ${
+              scenario.strategy.mode === 'win-now' ? 'bg-[#0a1628] border-[#3b82f6]/40' :
+              scenario.strategy.mode === 'rebuild' ? 'bg-[#1a0a00] border-[#f59e0b]/40' :
+              'bg-[#0a1a0a] border-[#10b981]/40'
+            }`}>
+              <div className={`text-xs font-bold uppercase tracking-widest mb-2 ${
+                scenario.strategy.mode === 'win-now' ? 'text-[#3b82f6]' :
+                scenario.strategy.mode === 'rebuild' ? 'text-[#f59e0b]' : 'text-[#10b981]'
+              }`}>
+                {scenario.strategy.mode === 'win-now' ? '🏆 Win-Now Mode' :
+                 scenario.strategy.mode === 'rebuild' ? '🔨 Rebuild Mode' : '⚖️ Mixed Strategy'}
+              </div>
+              <p className="text-[#94a3b8] text-sm">{scenario.strategy.hint}</p>
+              {!isAdvanced && (
+                <div className="mt-2 text-xs text-[#64748b]">
+                  {scenario.strategy.mode === 'win-now' ? 'Prioritize: High rating + short contracts' :
+                   scenario.strategy.mode === 'rebuild' ? 'Prioritize: Future picks + players ≤24 years old' :
+                   'Balance: Keep stars, trade role players for picks'}
+                </div>
+              )}
             </div>
           </div>
 
@@ -239,6 +277,24 @@ export default function BlockbusterPage() {
     const legality = isTradeCapLegal(outPlayers.map(p => p.salary), inPlayers.map(p => p.salary), 'over');
     const hasDeal = selectedOutgoing.length > 0 || selectedOutgoingPicks.length > 0;
     const hasReturn = selectedIncoming.length > 0 || selectedIncomingPicks.length > 0;
+
+    // Live trade value balance calculation
+    function tradeVal(players: typeof outPlayers, picks: typeof outPicksList) {
+      return players.reduce((s, p) => s + p.rating * 0.6 + (p.rating / Math.max(p.salary, 5)) * 10 + p.yearsLeft * 1.5, 0)
+        + picks.reduce((s, pk) => s + pk.estimatedValue * 4, 0);
+    }
+    const outValue = tradeVal(outPlayers, outPicksList);
+    const inValue  = tradeVal(inPlayers, inPicksList);
+    const valueRatio = outValue > 0 || inValue > 0 ? outValue / Math.max(outValue + inValue, 1) : 0.5;
+    const youWinning = outValue > inValue * 1.05;
+    const theyWinning = inValue > outValue * 1.05;
+
+    function ageLabel(age: number): { text: string; color: string } {
+      if (age <= 24) return { text: 'Developing', color: '#8b5cf6' };
+      if (age <= 28) return { text: 'Peak', color: '#10b981' };
+      if (age <= 31) return { text: 'Prime-Late', color: '#f59e0b' };
+      return { text: 'Declining', color: '#ef4444' };
+    }
 
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -310,15 +366,76 @@ export default function BlockbusterPage() {
         {hasDeal && hasReturn && (
           <div className="mt-6 p-5 bg-[#111827] rounded-xl border border-[#1e293b]">
             <div className="text-sm font-bold text-[#e2e8f0] mb-3">Trade Summary</div>
+
+            {/* Live trade value balance */}
+            <div className="mb-4 p-3 bg-[#0a0e1a] rounded-lg">
+              <div className="flex justify-between text-xs mb-1">
+                <span className={youWinning ? 'text-[#10b981] font-bold' : 'text-[#64748b]'}>YOU</span>
+                <span className="text-[#64748b]">Trade Value Balance</span>
+                <span className={theyWinning ? 'text-[#ef4444] font-bold' : 'text-[#64748b]'}>AI TEAM</span>
+              </div>
+              <div className="h-3 bg-[#1e293b] rounded-full overflow-hidden flex">
+                <div className="h-full bg-[#10b981] rounded-l-full transition-all" style={{ width: `${valueRatio * 100}%` }} />
+                <div className="h-full bg-[#ef4444] rounded-r-full transition-all" style={{ width: `${(1 - valueRatio) * 100}%` }} />
+              </div>
+              <div className="text-xs text-center mt-1" style={{ color: youWinning ? '#10b981' : theyWinning ? '#ef4444' : '#f59e0b' }}>
+                {youWinning ? '✓ You\'re winning this trade' : theyWinning ? 'AI team is getting the better deal' : '⚖️ Roughly even value'}
+              </div>
+              <button
+                onClick={() => setShowFormula(f => !f)}
+                className="mt-2 text-xs text-[#64748b] hover:text-[#f59e0b] underline w-full text-center transition-colors"
+              >
+                {showFormula ? '▲ Hide formula' : '▼ How is this calculated?'}
+              </button>
+              {showFormula && (
+                <div className="mt-2 p-3 bg-[#111827] rounded-lg text-xs space-y-1.5">
+                  <div className="text-[#f59e0b] font-bold mb-1">Player Value Formula:</div>
+                  <div className="font-mono text-[#e2e8f0]">Value = (Rating × 0.6) + (Rating ÷ Salary × 10) + (Years Left × 1.5)</div>
+                  {!isAdvanced && (
+                    <div className="space-y-1 mt-2 text-[#94a3b8]">
+                      <div><span className="text-[#3b82f6]">Rating × 0.6</span> = how talented the player is (40% weight)</div>
+                      <div><span className="text-[#10b981]">Rating ÷ Salary × 10</span> = bang for your buck (are they cheap for their talent?)</div>
+                      <div><span className="text-[#8b5cf6]">Years Left × 1.5</span> = contract length bonus (longer = more value)</div>
+                      <div className="text-[#f59e0b] mt-1">Draft picks add flat value (estimatedValue × 4)</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <div className="text-xs text-red-400 font-bold mb-2">YOU SEND ({formatMoneyShort(outSalary)})</div>
-                {outPlayers.map(p => <div key={p.id} className="text-xs text-[#e2e8f0]">• {p.name} ({formatMoneyShort(p.salary)})</div>)}
+                {outPlayers.map(p => {
+                  const al = ageLabel(p.age);
+                  return (
+                    <div key={p.id} className="text-xs text-[#e2e8f0] mb-1">
+                      • {p.name} ({formatMoneyShort(p.salary)})
+                      <span className="ml-1 px-1 rounded text-[10px]" style={{ color: al.color }}>Age {p.age} · {al.text}</span>
+                    </div>
+                  );
+                })}
                 {outPicksList.map(pk => <div key={pk.id} className="text-xs text-[#8b5cf6]">• {pk.year} 1st (value: {pk.estimatedValue}/10)</div>)}
               </div>
               <div>
                 <div className="text-xs text-green-400 font-bold mb-2">YOU RECEIVE ({formatMoneyShort(inSalary)})</div>
-                {inPlayers.map(p => <div key={p.id} className="text-xs text-[#e2e8f0]">• {p.name} ({formatMoneyShort(p.salary)})</div>)}
+                {inPlayers.map(p => {
+                  const al = ageLabel(p.age);
+                  const studentNeeds = studentTeam?.needs || [];
+                  const fitsNeed = studentNeeds.some(n =>
+                    n.toLowerCase() === p.position.toLowerCase() ||
+                    p.name.toLowerCase().includes(n.toLowerCase())
+                  );
+                  return (
+                    <div key={p.id} className="text-xs text-[#e2e8f0] mb-1">
+                      • {p.name} ({formatMoneyShort(p.salary)})
+                      <span className="ml-1 px-1 rounded text-[10px]" style={{ color: al.color }}>Age {p.age} · {al.text}</span>
+                      <span className="ml-1 text-[10px]" style={{ color: fitsNeed ? '#10b981' : '#64748b' }}>
+                        {fitsNeed ? '✓ Fits your needs' : '— Neutral'}
+                      </span>
+                    </div>
+                  );
+                })}
                 {inPicksList.map(pk => <div key={pk.id} className="text-xs text-[#8b5cf6]">• {pk.year} 1st (value: {pk.estimatedValue}/10)</div>)}
               </div>
             </div>
@@ -347,7 +464,26 @@ export default function BlockbusterPage() {
 
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-black text-white mb-2">GM-to-GM Negotiation</h1>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-2xl font-black text-white">GM-to-GM Negotiation</h1>
+          {isAdvanced && timeLeft >= 0 && (
+            <div className="flex flex-col items-end">
+              <span className="text-xs font-bold" style={{ color: timeLeft <= 10 ? '#ef4444' : '#f59e0b' }}>
+                ⏱ {timeLeft}s
+              </span>
+              <div className="w-32 h-2 bg-[#1e293b] rounded-full overflow-hidden mt-1">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${(timeLeft / 30) * 100}%`,
+                    backgroundColor: timeLeft <= 10 ? '#ef4444' : '#f59e0b',
+                  }}
+                />
+              </div>
+              <span className="text-[10px] text-[#64748b] mt-0.5">Auto-accept when it hits 0</span>
+            </div>
+          )}
+        </div>
         <p className="text-[#64748b] text-sm mb-6">Round {negotiationRound} · {targetTeam.city} {targetTeam.name} responds:</p>
 
         <div className="p-6 bg-[#111827] rounded-xl border-2 mb-6 verdict-slide" style={{ borderColor: decisionColors[aiResponse.decision] }}>
@@ -374,7 +510,7 @@ export default function BlockbusterPage() {
             </button>
           )}
           {negotiationRound < 3 && (
-            <button onClick={() => setStage('build-offer')} className="flex-1 py-3 bg-[#1a2035] text-white font-bold rounded-xl border border-[#1e293b] hover:border-[#f59e0b] transition-colors">
+            <button onClick={() => { setStage('build-offer'); setTimeLeft(-1); }} className="flex-1 py-3 bg-[#1a2035] text-white font-bold rounded-xl border border-[#1e293b] hover:border-[#f59e0b] transition-colors">
               🔄 REVISE OFFER
             </button>
           )}
@@ -389,6 +525,50 @@ export default function BlockbusterPage() {
   // ── STAGE: OUTCOME ──────────────────────────────────────────────────────────
   if (stage === 'outcome' && scenario) {
     const dealMade = finalScore !== null;
+
+    // Win% impact analysis for the dealt players
+    const inPlayers = targetTeam?.players.filter(p => selectedIncoming.includes(p.id)) || [];
+    const outPlayers = studentTeam?.players.filter(p => selectedOutgoing.includes(p.id)) || [];
+    const avgAgeIn  = inPlayers.length  ? inPlayers.reduce((s, p)  => s + p.age, 0) / inPlayers.length  : 0;
+    const avgAgeOut = outPlayers.length ? outPlayers.reduce((s, p) => s + p.age, 0) / outPlayers.length : 0;
+    const avgRatingIn  = inPlayers.length  ? inPlayers.reduce((s, p)  => s + p.rating, 0) / inPlayers.length  : 0;
+    const avgRatingOut = outPlayers.length ? outPlayers.reduce((s, p) => s + p.rating, 0) / outPlayers.length : 0;
+    const winPctDelta  = ((avgRatingIn - avgRatingOut) / 100) * 0.4;
+    const winDelta     = Math.round(winPctDelta * 82);
+
+    // Compute letter grade for localStorage
+    const scoreTotal = finalScore
+      ? Math.round(finalScore.valueAcquired * 4 + finalScore.capEfficiency * 3 + finalScore.futureAssets * 3)
+      : 0;
+    const letterGrade = scoreTotal >= 90 ? 'A+' : scoreTotal >= 85 ? 'A' : scoreTotal >= 75 ? 'B+' : scoreTotal >= 65 ? 'B' : scoreTotal >= 55 ? 'C' : 'D';
+
+    if (!gradeRevealed) {
+      return (
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <h1 className="text-2xl font-black text-white mb-2">{dealMade ? '🤝 Deal Done' : '🚫 No Deal'}</h1>
+          <p className="text-[#64748b] text-sm mb-6">{scenario.title} — {scenario.year}</p>
+          <div className="text-center py-16">
+            <div className="text-[#64748b] text-sm mb-6">
+              {dealMade ? 'Trade logged. Evaluating GM performance...' : 'Walkaway recorded. Calculating negotiation score...'}
+            </div>
+            <button
+              onClick={() => {
+                setGradeRevealed(true);
+                try {
+                  const prev = JSON.parse(localStorage.getItem('bsc-completed') || '{}');
+                  prev['/blockbuster'] = { completed: true, grade: dealMade ? letterGrade : '—' };
+                  localStorage.setItem('bsc-completed', JSON.stringify(prev));
+                } catch {}
+              }}
+              className="px-10 py-4 bg-[#f59e0b] text-black font-black rounded-xl text-lg hover:bg-[#d97706] transition-colors animate-pulse"
+            >
+              Reveal GM Score
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-black text-white mb-2">{dealMade ? '🤝 Deal Done' : '🚫 No Deal'}</h1>
@@ -403,6 +583,29 @@ export default function BlockbusterPage() {
               title="Your GM Score"
               compareScore={scenario.historicalOutcome.score}
             />
+            {/* Win% and age impact */}
+            {inPlayers.length > 0 && outPlayers.length > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="p-3 bg-[#111827] rounded-xl border border-[#1e293b]">
+                  <div className="text-xs text-[#64748b] mb-1">Projected Win Impact</div>
+                  <div className="text-xl font-black" style={{ color: winDelta >= 0 ? '#10b981' : '#ef4444' }}>
+                    {winDelta >= 0 ? '+' : ''}{winDelta} wins
+                  </div>
+                  <div className="text-xs text-[#64748b] mt-1">
+                    {winDelta > 3 ? 'Significant upgrade to the roster' : winDelta < -3 ? 'Roster talent decreased' : 'Roughly talent-neutral'}
+                  </div>
+                </div>
+                <div className="p-3 bg-[#111827] rounded-xl border border-[#1e293b]">
+                  <div className="text-xs text-[#64748b] mb-1">Age Trade-Off</div>
+                  <div className="text-xl font-black" style={{ color: avgAgeIn <= avgAgeOut ? '#10b981' : '#f59e0b' }}>
+                    {avgAgeIn <= avgAgeOut ? 'Got Younger' : 'Got Older'}
+                  </div>
+                  <div className="text-xs text-[#64748b] mt-1">
+                    Sent avg age {avgAgeOut.toFixed(0)}, received avg age {avgAgeIn.toFixed(0)}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

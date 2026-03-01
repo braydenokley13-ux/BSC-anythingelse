@@ -956,7 +956,15 @@ export default function RookieDealPage() {
               <div className="text-center py-16">
                 <div className="text-[#64748b] text-sm mb-6">All decisions locked in. Calculating career value...</div>
                 <button
-                  onClick={() => setGradeRevealed(true)}
+                  onClick={() => {
+                    setGradeRevealed(true);
+                    try {
+                      const { grade } = gradeFromScore(finalScore);
+                      const prev = JSON.parse(localStorage.getItem('bsc-completed') || '{}');
+                      prev['/rookie-deal'] = { completed: true, grade };
+                      localStorage.setItem('bsc-completed', JSON.stringify(prev));
+                    } catch {}
+                  }}
                   className="px-10 py-4 bg-[#f59e0b] text-black font-black rounded-xl text-lg hover:bg-[#d97706] transition-colors animate-pulse"
                 >
                   Reveal Career Grade

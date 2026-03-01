@@ -46,6 +46,7 @@ export default function GroundZeroPage() {
   const [finalScore, setFinalScore] = useState<{ wins: number; capFlexibility: number; fanGrowth: number; aiWins: number } | null>(null);
   const [showWinFormula, setShowWinFormula] = useState(false);
   const [draftSubStep, setDraftSubStep] = useState(0);
+  const [gradeRevealed, setGradeRevealed] = useState(false);
 
   const isAdvanced = track === '7-8';
   const availablePlayers = EXPANSION_PLAYER_POOL.filter(p => !p.isProtected && !aiRivalPicks.includes(p.id));
@@ -707,6 +708,33 @@ export default function GroundZeroPage() {
       ? finalScore.wins <= 20 ? '#1–2' : finalScore.wins <= 25 ? '#3–5' : finalScore.wins <= 30 ? '#5–7' : '#7–10'
       : null;
 
+    const outcomeBadge = beat ? 'W' : 'L';
+
+    if (!gradeRevealed) {
+      return (
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <h1 className="text-3xl font-black text-white mb-1">Franchise Verdict</h1>
+          <p className="text-[#64748b] text-sm mb-6">{state.city?.name} <span className="text-[#f59e0b]">{state.teamNickname}</span> · Year 1</p>
+          <div className="text-center py-16">
+            <div className="text-[#64748b] text-sm mb-6">Season complete. Tallying wins, cap flexibility, and fan growth...</div>
+            <button
+              onClick={() => {
+                setGradeRevealed(true);
+                try {
+                  const prev = JSON.parse(localStorage.getItem('bsc-completed') || '{}');
+                  prev['/ground-zero'] = { completed: true, grade: outcomeBadge };
+                  localStorage.setItem('bsc-completed', JSON.stringify(prev));
+                } catch {}
+              }}
+              className="px-10 py-4 bg-[#10b981] text-black font-black rounded-xl text-lg hover:bg-[#059669] transition-colors animate-pulse"
+            >
+              Reveal Season Results
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-black text-white mb-1">Franchise Verdict</h1>
@@ -803,6 +831,7 @@ export default function GroundZeroPage() {
             setFinalScore(null);
             setSeasonEvents([]);
             setMonthlyVariance([]);
+            setGradeRevealed(false);
           }}
           className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl"
         >

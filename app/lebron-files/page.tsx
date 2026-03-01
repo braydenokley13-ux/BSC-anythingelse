@@ -52,6 +52,7 @@ export default function LeBronFilesPage() {
   const [pendingPhase, setPendingPhase] = useState<Phase | null>(null);
   const [decisionSubStep, setDecisionSubStep] = useState(0);
   const [pendingScandal, setPendingScandal] = useState<{ brand: string; risk: number } | null>(null);
+  const [gradeRevealed, setGradeRevealed] = useState(false);
   const [scandalBrand, setScandalBrand] = useState<string | null>(null);
   const [legacyBreakdown, setLegacyBreakdown] = useState<{ source: string; amount: number }[]>([]);
 
@@ -952,6 +953,33 @@ export default function LeBronFilesPage() {
       { source: `Investment cultural impact`, amount: career.investments.reduce((s, i) => s + i.culturalImpact, 0), color: '#10b981' },
     ].filter(b => b.amount !== 0);
 
+    const legacyGrade = career.legacyScore >= 85 ? 'A+' : career.legacyScore >= 75 ? 'A' : career.legacyScore >= 65 ? 'B+' : career.legacyScore >= 55 ? 'B' : 'C';
+
+    if (!gradeRevealed) {
+      return (
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <h1 className="text-3xl font-black text-white mb-2">LeBron&apos;s Final Story</h1>
+          <p className="text-[#64748b] text-sm mb-8">All decisions locked in. Calculating legacy score...</p>
+          <div className="text-center py-16">
+            <div className="text-[#64748b] text-sm mb-6">20+ years of decisions compiled. Legacy = rings + brand + investments.</div>
+            <button
+              onClick={() => {
+                setGradeRevealed(true);
+                try {
+                  const prev = JSON.parse(localStorage.getItem('bsc-completed') || '{}');
+                  prev['/lebron-files'] = { completed: true, grade: legacyGrade };
+                  localStorage.setItem('bsc-completed', JSON.stringify(prev));
+                } catch {}
+              }}
+              className="px-10 py-4 bg-[#8b5cf6] text-white font-black rounded-xl text-lg hover:bg-[#7c3aed] transition-colors animate-pulse"
+            >
+              Reveal Legacy Score
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-black text-white mb-2">LeBron&apos;s Final Story</h1>
@@ -1010,7 +1038,7 @@ export default function LeBronFilesPage() {
 
         <div className="flex gap-3">
           <button
-            onClick={() => { setPhase('intro'); setCareer({ chosenTeam2010: null, contractChoice2010: null, endorsements: [], extensions: [], chosenTeam2018: null, contractChoice2018: null, investments: [], rings: 0, earnings: 0, legacyScore: 50, portfolioValue: 0, brandValue: 0 }); setSelectedTeam(null); setSelectedContract(null); setSelectedEndorsements([]); setSelectedInvestments([]); setRevealedStep(false); setDecisionSubStep(0); setPendingScandal(null); }}
+            onClick={() => { setPhase('intro'); setCareer({ chosenTeam2010: null, contractChoice2010: null, endorsements: [], extensions: [], chosenTeam2018: null, contractChoice2018: null, investments: [], rings: 0, earnings: 0, legacyScore: 50, portfolioValue: 0, brandValue: 0 }); setSelectedTeam(null); setSelectedContract(null); setSelectedEndorsements([]); setSelectedInvestments([]); setRevealedStep(false); setDecisionSubStep(0); setPendingScandal(null); setGradeRevealed(false); }}
             className="flex-1 py-3 bg-[#f59e0b] text-black font-black rounded-xl"
           >
             REPLAY

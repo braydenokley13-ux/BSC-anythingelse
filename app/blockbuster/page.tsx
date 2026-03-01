@@ -24,6 +24,7 @@ export default function BlockbusterPage() {
   const [finalScore, setFinalScore] = useState<{ valueAcquired: number; capEfficiency: number; futureAssets: number } | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(-1);
   const [showFormula, setShowFormula] = useState(false);
+  const [gradeRevealed, setGradeRevealed] = useState(false);
 
   const scenario = scenarioId ? TRADE_SCENARIOS.find(s => s.id === scenarioId) : null;
   const studentTeam = scenario?.teams.find(t => t.id === scenario.studentTeam);
@@ -114,6 +115,7 @@ export default function BlockbusterPage() {
     setFinalScore(null);
     setTimeLeft(-1);
     setShowFormula(false);
+    setGradeRevealed(false);
   }
 
   // ── STAGE: SELECT SCENARIO ──────────────────────────────────────────────────
@@ -533,6 +535,39 @@ export default function BlockbusterPage() {
     const avgRatingOut = outPlayers.length ? outPlayers.reduce((s, p) => s + p.rating, 0) / outPlayers.length : 0;
     const winPctDelta  = ((avgRatingIn - avgRatingOut) / 100) * 0.4;
     const winDelta     = Math.round(winPctDelta * 82);
+
+    // Compute letter grade for localStorage
+    const scoreTotal = finalScore
+      ? Math.round(finalScore.valueAcquired * 4 + finalScore.capEfficiency * 3 + finalScore.futureAssets * 3)
+      : 0;
+    const letterGrade = scoreTotal >= 90 ? 'A+' : scoreTotal >= 85 ? 'A' : scoreTotal >= 75 ? 'B+' : scoreTotal >= 65 ? 'B' : scoreTotal >= 55 ? 'C' : 'D';
+
+    if (!gradeRevealed) {
+      return (
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <h1 className="text-2xl font-black text-white mb-2">{dealMade ? '🤝 Deal Done' : '🚫 No Deal'}</h1>
+          <p className="text-[#64748b] text-sm mb-6">{scenario.title} — {scenario.year}</p>
+          <div className="text-center py-16">
+            <div className="text-[#64748b] text-sm mb-6">
+              {dealMade ? 'Trade logged. Evaluating GM performance...' : 'Walkaway recorded. Calculating negotiation score...'}
+            </div>
+            <button
+              onClick={() => {
+                setGradeRevealed(true);
+                try {
+                  const prev = JSON.parse(localStorage.getItem('bsc-completed') || '{}');
+                  prev['/blockbuster'] = { completed: true, grade: dealMade ? letterGrade : '—' };
+                  localStorage.setItem('bsc-completed', JSON.stringify(prev));
+                } catch {}
+              }}
+              className="px-10 py-4 bg-[#f59e0b] text-black font-black rounded-xl text-lg hover:bg-[#d97706] transition-colors animate-pulse"
+            >
+              Reveal GM Score
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">

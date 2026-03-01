@@ -49,6 +49,7 @@ export default function DumpsterFirePage() {
   const [selectedScenarioPreview, setSelectedScenarioPreview] = useState<CapNightmareScenario | null>(null);
   const [flashEntry, setFlashEntry] = useState<FlashEntry | null>(null);
   const [showMoraleFormula, setShowMoraleFormula] = useState(false);
+  const [gradeRevealed, setGradeRevealed] = useState(false);
 
   const isAdvanced = track === '7-8';
 
@@ -79,6 +80,7 @@ export default function DumpsterFirePage() {
     setErrorMessage(null);
     setShowMlePanel(false);
     setFlashEntry(null);
+    setGradeRevealed(false);
   }
 
   function applyTool(tool: string, playerId: string) {
@@ -780,6 +782,30 @@ export default function DumpsterFirePage() {
   const moraleBonus = (state.starMorale - 50) / 1000;
   const moraleWinAdj = Math.round(moraleBonus * 82 * 10) / 10; // fractional wins
   const taxPenaltyPoints = scores.taxBill > 0 ? Math.round(scores.taxBill * 5) : 0;
+
+  if (!gradeRevealed) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <h1 className="text-3xl font-black text-white mb-6">3-Year Rebuild Verdict</h1>
+        <div className="text-center py-16">
+          <div className="text-[#64748b] text-sm mb-6">3 years of decisions locked in. Calculating rebuild score...</div>
+          <button
+            onClick={() => {
+              setGradeRevealed(true);
+              try {
+                const prev = JSON.parse(localStorage.getItem('bsc-completed') || '{}');
+                prev['/dumpster-fire'] = { completed: true, grade };
+                localStorage.setItem('bsc-completed', JSON.stringify(prev));
+              } catch {}
+            }}
+            className="px-10 py-4 bg-[#ef4444] text-white font-black rounded-xl text-lg hover:bg-[#dc2626] transition-colors animate-pulse"
+          >
+            Reveal Rebuild Grade
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">

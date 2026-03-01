@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { CAP_NIGHTMARE_SCENARIOS, REBUILD_TOOLS } from '@/data/capNightmareTeams';
+import { CAP_NIGHTMARE_SCENARIOS, REBUILD_TOOLS, MLE_FREE_AGENTS, PRESS_EVENTS } from '@/data/capNightmareTeams';
 import type { CapNightmareScenario, CapPlayer } from '@/data/capNightmareTeams';
 import { calculateLuxuryTax, formatMoneyShort, stretchProvision } from '@/lib/CapMath';
 import MoraleBar from '@/components/shared/MoraleBar';
 import { HintBox } from '@/components/shared/TrackWrapper';
 
-type Phase = 'select' | 'year1' | 'year2' | 'year3' | 'verdict';
+type Phase = 'select' | 'year1' | 'year2' | 'year3' | 'press-event' | 'verdict';
 
 interface RebuildState {
   scenario: CapNightmareScenario | null;
@@ -21,6 +21,7 @@ interface RebuildState {
   capHealth: number;
   fanConfidence: number;
   isTanking: boolean;
+  mleUsed: boolean;
 }
 
 export default function DumpsterFirePage() {
@@ -29,12 +30,15 @@ export default function DumpsterFirePage() {
   const [state, setState] = useState<RebuildState>({
     scenario: null, players: [], picks: [], totalSalary: 0,
     starMorale: 0, lockerRoomMorale: 0, winPct: 0,
-    decisions: [], capHealth: 0, fanConfidence: 50, isTanking: false,
+    decisions: [], capHealth: 0, fanConfidence: 50, isTanking: false, mleUsed: false,
   });
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
-  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [actionLog, setActionLog] = useState<string[]>([]);
   const [yearScores, setYearScores] = useState<Record<string, number>>({});
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showMlePanel, setShowMlePanel] = useState(false);
+  const [pendingPressEvent, setPendingPressEvent] = useState<typeof PRESS_EVENTS[0] | null>(null);
+  const [pendingNextPhase, setPendingNextPhase] = useState<Phase | null>(null);
 
   const isAdvanced = track === '7-8';
 
@@ -51,15 +55,19 @@ export default function DumpsterFirePage() {
       capHealth: 0,
       fanConfidence: 50,
       isTanking: false,
+      mleUsed: false,
     });
     setActionLog([]);
     setPhase('year1');
+    setErrorMessage(null);
+    setShowMlePanel(false);
   }
 
   function applyTool(tool: string, playerId: string) {
     const player = state.players.find(p => p.id === playerId);
     if (!player) return;
 
+    setErrorMessage(null);
     let newPlayers = [...state.players];
     let newSalary = state.totalSalary;
     let newMorale = state.lockerRoomMorale;
@@ -69,17 +77,19 @@ export default function DumpsterFirePage() {
 
     switch (tool) {
       case 'trade': {
-        // Trade: remove player, gain minor value, reduce salary
         const tradeValue = player.tradeValue;
         newPlayers = newPlayers.filter(p => p.id !== playerId);
         newSalary -= player.salary;
-        newMorale += player.moraleImpact > 0 ? -5 : 5; // lose a good guy = morale drops, lose cancer = morale up
+        newMorale += player.moraleImpact > 0 ? -5 : 5;
         newWinPct -= player.rating / 1000;
         logEntry = `✓ TRADED ${player.name} (${formatMoneyShort(player.salary)}/yr). Trade value was ${tradeValue}/10. Cap freed: ${formatMoneyShort(player.salary)}/yr.`;
         break;
       }
       case 'stretch': {
-        if (!player.canBeStretched) { alert(`${player.name}'s contract cannot be stretched.`); return; }
+        if (!player.canBeStretched) {
+          setErrorMessage(`${player.name}'s contract cannot be stretched — minimum 2 years required.`);
+          return;
+        }
         const { yearsSpread, perYearAmount } = stretchProvision(player.salary, player.yearsLeft);
         newPlayers = newPlayers.filter(p => p.id !== playerId);
         newSalary = newSalary - player.salary + perYearAmount;
@@ -87,7 +97,10 @@ export default function DumpsterFirePage() {
         break;
       }
       case 'buyout': {
-        if (!player.canBeBoughtOut) { alert(`${player.name} refused buyout terms.`); return; }
+        if (!player.canBeBoughtOut) {
+          setErrorMessage(`${player.name} refused buyout terms — their agent won't agree.`);
+          return;
+        }
         const buyoutPenalty = player.salary * 0.3;
         newSalary = newSalary - player.salary + buyoutPenalty;
         newPlayers = newPlayers.filter(p => p.id !== playerId);
@@ -96,10 +109,9 @@ export default function DumpsterFirePage() {
       }
       case 'tank': {
         setState(s => ({ ...s, isTanking: !s.isTanking }));
-        logEntry = state.isTanking ? '🎯 STOPPED TANKING — Competing again.' : '🎯 ENTERED TANK MODE — Sacrificing wins for draft position.';
-        setActionLog(prev => [...prev, logEntry]);
+        const logMsg = state.isTanking ? '🎯 STOPPED TANKING — Competing again.' : '🎯 ENTERED TANK MODE — Sacrificing wins for draft position.';
+        setActionLog(prev => [...prev, logMsg]);
         setSelectedTool(null);
-        setSelectedPlayer(null);
         return;
       }
       default:
@@ -120,7 +132,43 @@ export default function DumpsterFirePage() {
     }));
     setActionLog(prev => [...prev, logEntry]);
     setSelectedTool(null);
-    setSelectedPlayer(null);
+  }
+
+  function signMLE(agentId: string) {
+    if (state.mleUsed) {
+      setErrorMessage('You already used your Mid-Level Exception this season.');
+      return;
+    }
+    const agent = MLE_FREE_AGENTS.find(a => a.id === agentId);
+    if (!agent) return;
+
+    const newPlayer: CapPlayer = {
+      id: agent.id,
+      name: agent.name,
+      position: agent.position,
+      age: agent.age,
+      salary: agent.salary,
+      yearsLeft: 2,
+      rating: agent.rating,
+      projectedRating: { 0: agent.rating, 1: agent.rating - 1, 2: agent.rating - 2 },
+      tradeValue: 3,
+      moraleImpact: agent.moraleImpact,
+      canBeStretched: false,
+      canBeBoughtOut: true,
+      tradeInterest: [],
+    };
+
+    setState(s => ({
+      ...s,
+      players: [...s.players, newPlayer],
+      totalSalary: s.totalSalary + agent.salary,
+      lockerRoomMorale: Math.min(100, s.lockerRoomMorale + 5),
+      mleUsed: true,
+    }));
+    setActionLog(prev => [...prev, `✍️ SIGNED ${agent.name} via MLE (${formatMoneyShort(agent.salary)}/yr). MLE used for this season.`]);
+    setShowMlePanel(false);
+    setSelectedTool(null);
+    setErrorMessage(null);
   }
 
   function advanceYear(year: 'year1' | 'year2') {
@@ -129,8 +177,29 @@ export default function DumpsterFirePage() {
     const tanking = state.isTanking ? 10 : 0;
     setYearScores(prev => ({ ...prev, [year]: Math.round((capHealth + competitiveness + tanking) / 3) }));
 
-    if (year === 'year1') setPhase('year2');
-    else setPhase('year3');
+    // Random press event between years
+    const event = PRESS_EVENTS[Math.floor(Math.random() * PRESS_EVENTS.length)];
+    const nextPhase: Phase = year === 'year1' ? 'year2' : 'year3';
+    setPendingPressEvent(event);
+    setPendingNextPhase(nextPhase);
+    setPhase('press-event');
+  }
+
+  function applyPressEvent() {
+    if (!pendingPressEvent || !pendingNextPhase) return;
+    setState(s => ({
+      ...s,
+      starMorale: Math.max(0, Math.min(100, s.starMorale + pendingPressEvent.starMoraleChange)),
+      lockerRoomMorale: Math.max(0, Math.min(100, s.lockerRoomMorale + pendingPressEvent.lockerRoomChange)),
+      fanConfidence: Math.max(0, Math.min(100, s.fanConfidence + pendingPressEvent.fanConfidenceChange)),
+      mleUsed: false, // MLE resets each season
+    }));
+    setPhase(pendingNextPhase);
+    setPendingPressEvent(null);
+    setPendingNextPhase(null);
+    setShowMlePanel(false);
+    setSelectedTool(null);
+    setErrorMessage(null);
   }
 
   function calculateFinalScore() {
@@ -166,7 +235,7 @@ export default function DumpsterFirePage() {
 
         {!isAdvanced && (
           <HintBox>
-            You&apos;re going to take over a real team&apos;s worst financial situation. You have tools: Trade, Stretch, Buyout, and more. Every decision has consequences — choose carefully over 3 years.
+            You&apos;re going to take over a real team&apos;s worst financial situation. You have tools: Trade, Stretch, Buyout, MLE, and more. Every decision has consequences — choose carefully over 3 years. Press conferences between years add random events!
           </HintBox>
         )}
 
@@ -209,6 +278,40 @@ export default function DumpsterFirePage() {
 
   if (!state.scenario) return null;
 
+  // PRESS EVENT SCREEN
+  if (phase === 'press-event' && pendingPressEvent) {
+    const isPositive = pendingPressEvent.starMoraleChange > 0 || pendingPressEvent.lockerRoomChange > 0;
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="text-xs text-[#64748b] uppercase tracking-widest mb-4">🎙️ OFF-SEASON EVENT</div>
+        <div className={`p-6 rounded-xl border-2 mb-6 ${isPositive ? 'border-[#10b981] bg-green-900/10' : 'border-[#ef4444] bg-red-900/10'}`}>
+          <div className="text-3xl mb-4">{isPositive ? '📣' : '⚠️'}</div>
+          <p className="text-[#e2e8f0] text-lg font-semibold mb-4">{pendingPressEvent.text}</p>
+          <div className="grid grid-cols-3 gap-3 text-xs">
+            {[
+              { label: 'Star Morale', change: pendingPressEvent.starMoraleChange },
+              { label: 'Locker Room', change: pendingPressEvent.lockerRoomChange },
+              { label: 'Fan Confidence', change: pendingPressEvent.fanConfidenceChange },
+            ].map(({ label, change }) => (
+              <div key={label} className="p-2 bg-[#0a0e1a] rounded-lg text-center">
+                <div className={`font-black text-lg ${change > 0 ? 'text-[#10b981]' : change < 0 ? 'text-[#ef4444]' : 'text-[#64748b]'}`}>
+                  {change > 0 ? '+' : ''}{change}
+                </div>
+                <div className="text-[#64748b]">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="p-3 bg-[#111827] rounded-xl border border-[#1e293b] mb-6 text-xs text-[#94a3b8]">
+          💡 MLE resets for the new season — you can sign another free agent via Mid-Level Exception.
+        </div>
+        <button onClick={applyPressEvent} className="w-full py-3 bg-[#f59e0b] text-black font-black rounded-xl">
+          CONTINUE TO NEXT YEAR →
+        </button>
+      </div>
+    );
+  }
+
   const currentYear = phase === 'year1' ? 'Year 1' : phase === 'year2' ? 'Year 2' : 'Year 3';
   const taxBill = calculateLuxuryTax(state.totalSalary);
 
@@ -227,7 +330,6 @@ export default function DumpsterFirePage() {
         </div>
       </div>
 
-      {/* Situation dashboard */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Total Salary', value: formatMoneyShort(state.totalSalary), color: state.totalSalary > 170 ? '#ef4444' : state.totalSalary > 140 ? '#f59e0b' : '#10b981' },
@@ -242,10 +344,18 @@ export default function DumpsterFirePage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-2 gap-3 mb-4">
         <MoraleBar value={state.starMorale} label="Star Morale" size="md" />
         <MoraleBar value={state.lockerRoomMorale} label="Locker Room" size="md" />
       </div>
+
+      {/* Inline error message */}
+      {errorMessage && (
+        <div className="mb-4 p-3 bg-red-900/20 border border-red-700 rounded-xl text-sm text-red-400 flex items-center justify-between">
+          <span>⚠️ {errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} className="text-red-400 hover:text-red-300 ml-4">✕</button>
+        </div>
+      )}
 
       {state.isTanking && (
         <div className="mb-4 p-3 bg-orange-900/20 border border-orange-700 rounded-xl text-sm text-orange-400 flex items-center gap-2">
@@ -255,7 +365,13 @@ export default function DumpsterFirePage() {
 
       {state.starMorale < 30 && (
         <div className="mb-4 p-3 bg-red-900/20 border border-red-700 rounded-xl text-sm text-red-400 flex items-center gap-2">
-          🔥 CRISIS — Star morale critical! If it hits 0%, they demand a trade publicly, crashing their trade value.
+          🔥 CRISIS — Star morale critical! If it hits 0%, they demand a trade publicly.
+        </div>
+      )}
+
+      {state.mleUsed && (
+        <div className="mb-4 p-3 bg-blue-900/20 border border-blue-700 rounded-xl text-xs text-blue-400">
+          ✍️ MLE used this season — resets next year.
         </div>
       )}
 
@@ -273,8 +389,8 @@ export default function DumpsterFirePage() {
             {state.players.map(player => (
               <div
                 key={player.id}
-                onClick={() => selectedTool && applyTool(selectedTool, player.id)}
-                className={`p-3 rounded-xl border transition-all ${selectedTool ? 'cursor-pointer hover:border-[#f59e0b]' : ''} ${selectedPlayer === player.id ? 'border-[#f59e0b] bg-[#2a1f00]' : 'border-[#1e293b] bg-[#111827]'}`}
+                onClick={() => selectedTool && selectedTool !== 'mle' && selectedTool !== 'tank' && applyTool(selectedTool, player.id)}
+                className={`p-3 rounded-xl border transition-all ${selectedTool && selectedTool !== 'mle' && selectedTool !== 'tank' ? 'cursor-pointer hover:border-[#f59e0b]' : ''} border-[#1e293b] bg-[#111827]`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -296,7 +412,9 @@ export default function DumpsterFirePage() {
                 </div>
                 {!isAdvanced && player.canBeBoughtOut && <div className="text-xs text-green-400 mt-1">✓ Buyout eligible</div>}
                 {!isAdvanced && player.canBeStretched && <div className="text-xs text-blue-400 mt-1">✓ Stretch eligible</div>}
-                {selectedTool && <div className="text-xs text-[#f59e0b] mt-1">Click to apply {selectedTool.toUpperCase()}</div>}
+                {selectedTool && selectedTool !== 'mle' && selectedTool !== 'tank' && (
+                  <div className="text-xs text-[#f59e0b] mt-1">Click to apply {selectedTool.toUpperCase()}</div>
+                )}
               </div>
             ))}
           </div>
@@ -305,21 +423,58 @@ export default function DumpsterFirePage() {
         {/* Tools panel */}
         <div>
           <div className="text-xs text-[#64748b] uppercase tracking-widest mb-3">GM Tools</div>
-          <div className="space-y-2 mb-6">
+          <div className="space-y-2 mb-4">
             {REBUILD_TOOLS.map(tool => (
               <button
                 key={tool.id}
-                onClick={() => setSelectedTool(selectedTool === tool.id ? null : tool.id)}
-                className={`w-full text-left p-3 rounded-xl border transition-all ${selectedTool === tool.id ? 'border-[#f59e0b] bg-[#2a1f00]' : 'border-[#1e293b] bg-[#111827] hover:border-[#64748b]'}`}
+                onClick={() => {
+                  if (tool.id === 'tank') {
+                    applyTool('tank', '');
+                  } else if (tool.id === 'mle') {
+                    setShowMlePanel(!showMlePanel);
+                    setSelectedTool(null);
+                  } else {
+                    setSelectedTool(selectedTool === tool.id ? null : tool.id);
+                    setShowMlePanel(false);
+                  }
+                }}
+                className={`w-full text-left p-3 rounded-xl border transition-all ${selectedTool === tool.id || (tool.id === 'mle' && showMlePanel) ? 'border-[#f59e0b] bg-[#2a1f00]' : 'border-[#1e293b] bg-[#111827] hover:border-[#64748b]'} ${tool.id === 'mle' && state.mleUsed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={tool.id === 'mle' && state.mleUsed}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span>{tool.icon}</span>
                   <span className="text-sm font-bold text-white">{tool.name}</span>
+                  {tool.id === 'mle' && state.mleUsed && <span className="text-xs text-[#64748b]">(used)</span>}
                 </div>
                 {!isAdvanced && <p className="text-xs text-[#64748b]">{tool.description}</p>}
               </button>
             ))}
           </div>
+
+          {/* MLE free agent panel */}
+          {showMlePanel && !state.mleUsed && (
+            <div className="mb-4 p-3 bg-[#111827] rounded-xl border border-[#f59e0b]/30">
+              <div className="text-xs text-[#f59e0b] font-bold mb-2 uppercase tracking-widest">MLE Free Agents</div>
+              <div className="space-y-2">
+                {MLE_FREE_AGENTS.map(agent => (
+                  <button
+                    key={agent.id}
+                    onClick={() => signMLE(agent.id)}
+                    className="w-full text-left p-2 bg-[#0a0e1a] rounded-lg border border-[#1e293b] hover:border-[#f59e0b] transition-all"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-white font-semibold">{agent.name}</span>
+                      <span className="text-[#64748b]">{agent.position}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs mt-0.5">
+                      <span className="text-[#3b82f6]">{agent.rating} OVR</span>
+                      <span className="text-[#f59e0b]">{formatMoneyShort(agent.salary)}/yr</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Action log */}
           {actionLog.length > 0 && (

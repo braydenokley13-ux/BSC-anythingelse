@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import {
   TEAM_OPTIONS_2010, CONTRACT_OPTIONS, ENDORSEMENT_DEALS, INVESTMENT_OPTIONS,
-  LEBRON_REAL_TIMELINE, type TeamOption, type EndorsementDeal, type InvestmentOption
+  LEBRON_REAL_TIMELINE, BRONNY_DECISIONS,
+  type TeamOption, type EndorsementDeal, type InvestmentOption
 } from '@/data/lebronCareerData';
 import { formatMoney } from '@/lib/CapMath';
 import { HintBox } from '@/components/shared/TrackWrapper';
 
-type Phase = 'intro' | 'decision-2010' | 'decision-extension' | 'decision-2018' | 'investments' | 'outcome';
+type Phase = 'intro' | 'decision-2010' | 'decision-extension' | 'decision-2018' | 'investments' | 'bronny-2023' | 'outcome';
 
 interface CareerState {
   chosenTeam2010: TeamOption | null;
@@ -113,6 +114,18 @@ export default function LeBronFilesPage() {
       investments: invested,
       portfolioValue: portfolio,
       legacyScore: c.legacyScore + culturalScore,
+    }));
+    setPhase('bronny-2023');
+  }
+
+  function confirmBronnyDecision(decisionId: string) {
+    const decision = BRONNY_DECISIONS.find(d => d.id === decisionId);
+    if (!decision) return;
+    setCareer(c => ({
+      ...c,
+      rings: c.rings + decision.ringsChange,
+      earnings: c.earnings + decision.earningsChange,
+      legacyScore: Math.min(100, c.legacyScore + decision.legacyChange),
     }));
     setPhase('outcome');
   }
@@ -527,6 +540,65 @@ export default function LeBronFilesPage() {
     );
   }
 
+  // ── BRONNY 2023 ──────────────────────────────────────────────────────────────
+  if (phase === 'bronny-2023') {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <div className="text-xs text-[#64748b] uppercase tracking-widest mb-1">PHASE 5 OF 5</div>
+          <h1 className="text-2xl font-black text-white">2023: The Bronny Moment</h1>
+          <p className="text-[#94a3b8] text-sm">LeBron is 38. Bronny James is entering the NBA Draft. The Lakers have a roster spot. What does LeBron do?</p>
+        </div>
+
+        <div className="flex items-center gap-6 mb-6 p-3 bg-[#111827] rounded-xl border border-[#1e293b] text-sm">
+          <div><div className="text-xs text-[#64748b]">Rings So Far</div><div className="text-xl">{'🏆'.repeat(career.rings) || '0'}</div></div>
+          <div><div className="text-xs text-[#64748b]">Earned So Far</div><div className="text-[#f59e0b] font-bold">{formatMoney(career.earnings)}</div></div>
+          <div><div className="text-xs text-[#64748b]">Legacy Score</div><div className="text-[#e2e8f0] font-bold">{Math.min(100, career.legacyScore)}/100</div></div>
+        </div>
+
+        {!isAdvanced && (
+          <div className="mb-6 p-4 bg-[#2a1f00] rounded-xl border border-[#f59e0b]/30">
+            <div className="text-xs text-[#f59e0b] font-bold uppercase tracking-widest mb-2">💡 The Dilemma</div>
+            <p className="text-[#e2e8f0] text-sm">Bronny went undrafted in Round 1 but the Lakers have a roster spot. Playing together = making NBA history as the first father-son duo. But it costs LeBron $45M+ in salary to take the vet minimum. Is legacy worth more than money?</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-4 mb-6">
+          {BRONNY_DECISIONS.map(decision => (
+            <button
+              key={decision.id}
+              onClick={() => confirmBronnyDecision(decision.id)}
+              className="text-left p-5 bg-[#1a2035] rounded-xl border border-[#1e293b] hover:border-[#f59e0b] transition-all group"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div className="text-white font-black text-base group-hover:text-[#f59e0b] transition-colors">{decision.label}</div>
+                  <p className="text-[#94a3b8] text-sm mt-1">{decision.description}</p>
+                </div>
+                <div className="ml-4 text-right shrink-0">
+                  <div className={`text-lg font-black ${decision.legacyChange > 10 ? 'text-[#10b981]' : decision.legacyChange > 0 ? 'text-[#f59e0b]' : 'text-[#64748b]'}`}>
+                    +{decision.legacyChange} legacy
+                  </div>
+                  <div className={`text-xs ${decision.earningsChange >= 0 ? 'text-[#f59e0b]' : 'text-[#ef4444]'}`}>
+                    {decision.earningsChange >= 0 ? '+' : ''}{formatMoney(decision.earningsChange)}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  {decision.pros.map(p => <div key={p} className="text-green-400">✓ {p}</div>)}
+                </div>
+                <div>
+                  {decision.cons.map(c => <div key={c} className="text-red-400">✗ {c}</div>)}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   // ── OUTCOME ─────────────────────────────────────────────────────────────────
   if (phase === 'outcome') {
     const totalNetWorth = career.earnings + career.portfolioValue + (career.brandValue * 5);
@@ -574,7 +646,7 @@ export default function LeBronFilesPage() {
 
         <div className="flex gap-3">
           <button
-            onClick={() => { setPhase('intro'); setCareer({ chosenTeam2010: null, contractChoice2010: null, endorsements: [], extensions: [], chosenTeam2018: null, contractChoice2018: null, investments: [], rings: 0, earnings: 0, legacyScore: 50, portfolioValue: 0, brandValue: 0 }); setSelectedTeam(null); setSelectedContract(null); setSelectedEndorsements([]); setSelectedInvestments([]); }}
+            onClick={() => { setPhase('intro'); setCareer({ chosenTeam2010: null, contractChoice2010: null, endorsements: [], extensions: [], chosenTeam2018: null, contractChoice2018: null, investments: [], rings: 0, earnings: 0, legacyScore: 50, portfolioValue: 0, brandValue: 0 }); setSelectedTeam(null); setSelectedContract(null); setSelectedEndorsements([]); setSelectedInvestments([]); setRevealedStep(false); }}
             className="flex-1 py-3 bg-[#f59e0b] text-black font-black rounded-xl"
           >
             REPLAY
